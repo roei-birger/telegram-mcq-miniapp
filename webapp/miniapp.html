@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>מחולל מבחנים - Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 16px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: var(--tg-theme-text-color);
+        }
+        
+        .subtitle {
+            color: var(--tg-theme-hint-color, #999);
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--tg-theme-button-color, #0088cc);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            margin-bottom: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--tg-theme-link-color, #0066aa);
+            background: var(--tg-theme-bg-color, #ffffff);
+        }
+        
+        .upload-area.dragover {
+            background: var(--tg-theme-button-color, #0088cc);
+            opacity: 0.2;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .file-info {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .file-info.show {
+            display: block;
+        }
+        
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .file-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #999);
+        }
+        
+        .questions-selector {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .questions-selector.show {
+            display: block;
+        }
+        
+        .questions-selector h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .quick-select {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .quick-btn {
+            padding: 12px;
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-button-color, #0088cc);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:hover, .quick-btn.active {
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+        
+        .custom-input {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .custom-input input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 8px;
+            font-size: 16px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        
+        .custom-input label {
+            font-size: 14px;
+        }
+        
+        .progress-area {
+            display: none;
+            text-align: center;
+            padding: 24px;
+        }
+        
+        .progress-area.show {
+            display: block;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-top-color: var(--tg-theme-button-color, #0088cc);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .result-area {
+            display: none;
+            text-align: center;
+            padding: 24px;
+        }
+        
+        .result-area.show {
+            display: block;
+        }
+        
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .button {
+            width: 100%;
+            padding: 16px;
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .button:hover {
+            opacity: 0.9;
+        }
+        
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .button.secondary {
+            background: transparent;
+            color: var(--tg-theme-button-color, #0088cc);
+            border: 2px solid var(--tg-theme-button-color, #0088cc);
+            margin-top: 8px;
+        }
+        
+        .files-list {
+            margin-bottom: 16px;
+        }
+        
+        .file-item {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .remove-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 מחולל מבחני MCQ</h1>
+        <p class="subtitle">העלה קובץ וצור מבחן אמריקאי בקלות</p>
+        
+        <!-- Upload Area -->
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📄</div>
+            <div>
+                <strong>לחץ כאן או גרור קובץ</strong>
+                <p style="font-size: 14px; color: var(--tg-theme-hint-color, #999); margin-top: 8px;">
+                    PDF, DOCX או TXT (עד 20MB)
+                </p>
+            </div>
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt">
+        </div>
+        
+        <!-- Files List -->
+        <div class="files-list" id="filesList"></div>
+        
+        <!-- File Info -->
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div class="file-stats">
+                <span id="fileSize"></span>
+                <span id="wordCount"></span>
+            </div>
+        </div>
+        
+        <!-- Questions Selector -->
+        <div class="questions-selector" id="questionsSelector">
+            <h3>כמה שאלות?</h3>
+            <div class="quick-select">
+                <button class="quick-btn" data-count="5">5</button>
+                <button class="quick-btn" data-count="10">10</button>
+                <button class="quick-btn" data-count="15">15</button>
+                <button class="quick-btn" data-count="20">20</button>
+            </div>
+            <div class="custom-input">
+                <label>מותאם אישית:</label>
+                <input type="number" id="customCount" min="3" max="50" placeholder="3-50">
+            </div>
+        </div>
+        
+        <!-- Generate Button -->
+        <button class="button" id="generateBtn" style="display: none;">
+            ✨ צור מבחן
+        </button>
+        
+        <!-- Progress -->
+        <div class="progress-area" id="progressArea">
+            <div class="spinner"></div>
+            <p><strong>יוצר את המבחן...</strong></p>
+            <p style="font-size: 14px; color: var(--tg-theme-hint-color, #999); margin-top: 8px;">
+                זה יכול לקחת 10-60 שניות
+            </p>
+        </div>
+        
+        <!-- Result -->
+        <div class="result-area" id="resultArea">
+            <div class="success-icon">✅</div>
+            <h2>המבחן מוכן!</h2>
+            <p style="margin: 16px 0; color: var(--tg-theme-hint-color, #999);">
+                המבחן נשלח אליך בצ'אט
+            </p>
+            <button class="button" onclick="resetApp()">צור מבחן נוסף</button>
+            <button class="button secondary" onclick="Telegram.WebApp.close()">סגור</button>
+        </div>
+    </div>
+    
+    <script>
+        // Telegram WebApp API
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.enableClosingConfirmation();
+        
+        // State
+        let uploadedFiles = [];
+        let selectedQuestionCount = 10;
+        
+        // Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const filesList = document.getElementById('filesList');
+        const fileInfo = document.getElementById('fileInfo');
+        const questionsSelector = document.getElementById('questionsSelector');
+        const generateBtn = document.getElementById('generateBtn');
+        const progressArea = document.getElementById('progressArea');
+        const resultArea = document.getElementById('resultArea');
+        
+        // Upload handling
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+        
+        // Drag & Drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+        
+        // Handle file
+        function handleFile(file) {
+            // Validate file type
+            const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+            if (!validTypes.includes(file.type) && !file.name.match(/\.(pdf|docx|txt)$/i)) {
+                tg.showAlert('סוג קובץ לא נתמך. השתמש ב-PDF, DOCX או TXT');
+                return;
+            }
+            
+            // Validate file size (20MB)
+            if (file.size > 20 * 1024 * 1024) {
+                tg.showAlert('הקובץ גדול מדי. מקסימום 20MB');
+                return;
+            }
+            
+            // Add to list
+            uploadedFiles.push(file);
+            updateFilesList();
+            
+            // Show selectors
+            questionsSelector.classList.add('show');
+            generateBtn.style.display = 'block';
+            
+            tg.showPopup({
+                title: 'הקובץ התווסף!',
+                message: 'רוצה להוסיף עוד קבצים?',
+                buttons: [
+                    {id: 'more', type: 'default', text: 'הוסף עוד'},
+                    {id: 'continue', type: 'ok', text: 'המשך'}
+                ]
+            });
+        }
+        
+        // Update files list
+        function updateFilesList() {
+            if (uploadedFiles.length === 0) {
+                filesList.innerHTML = '';
+                return;
+            }
+            
+            filesList.innerHTML = uploadedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div>
+                        <strong>${file.name}</strong><br>
+                        <span style="font-size: 12px; color: var(--tg-theme-hint-color, #999);">
+                            ${(file.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                    </div>
+                    <button class="remove-btn" onclick="removeFile(${index})">🗑️ הסר</button>
+                </div>
+            `).join('');
+        }
+        
+        // Remove file
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            updateFilesList();
+            
+            if (uploadedFiles.length === 0) {
+                questionsSelector.classList.remove('show');
+                generateBtn.style.display = 'none';
+            }
+        }
+        
+        // Quick select buttons
+        document.querySelectorAll('.quick-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedQuestionCount = parseInt(btn.dataset.count);
+                document.getElementById('customCount').value = '';
+            });
+        });
+        
+        // Custom count
+        document.getElementById('customCount').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            if (value >= 3 && value <= 50) {
+                selectedQuestionCount = value;
+                document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+            }
+        });
+        
+        // Generate button
+        generateBtn.addEventListener('click', async () => {
+            if (uploadedFiles.length === 0) {
+                tg.showAlert('אנא העלה לפחות קובץ אחד');
+                return;
+            }
+            
+            if (!selectedQuestionCount) {
+                tg.showAlert('אנא בחר כמות שאלות');
+                return;
+            }
+            
+            // Show progress
+            uploadArea.style.display = 'none';
+            filesList.style.display = 'none';
+            fileInfo.style.display = 'none';
+            questionsSelector.style.display = 'none';
+            generateBtn.style.display = 'none';
+            progressArea.classList.add('show');
+            
+            // Send to bot via WebApp
+            const formData = new FormData();
+            uploadedFiles.forEach((file, index) => {
+                formData.append(`file${index}`, file);
+            });
+            formData.append('question_count', selectedQuestionCount);
+            formData.append('user_id', tg.initDataUnsafe.user.id);
+            
+            try {
+                // Send data to bot
+                tg.sendData(JSON.stringify({
+                    files: uploadedFiles.map(f => ({name: f.name, size: f.size})),
+                    question_count: selectedQuestionCount
+                }));
+                
+                // Show success
+                progressArea.classList.remove('show');
+                resultArea.classList.add('show');
+                
+            } catch (error) {
+                tg.showAlert('אירעה שגיאה. נסה שוב.');
+                resetApp();
+            }
+        });
+        
+        // Reset app
+        function resetApp() {
+            uploadedFiles = [];
+            selectedQuestionCount = 10;
+            
+            uploadArea.style.display = 'block';
+            filesList.innerHTML = '';
+            fileInfo.classList.remove('show');
+            questionsSelector.classList.remove('show');
+            generateBtn.style.display = 'none';
+            progressArea.classList.remove('show');
+            resultArea.classList.remove('show');
+            
+            document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('customCount').value = '';
+        }
+        
+        // Set default selection
+        document.querySelector('[data-count="10"]').classList.add('active');
+    </script>
+</body>
+</html>
