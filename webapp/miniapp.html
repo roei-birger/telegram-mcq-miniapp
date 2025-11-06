@@ -455,37 +455,25 @@
                 return;
             }
             
-            // Show progress
-            uploadArea.style.display = 'none';
-            filesList.style.display = 'none';
-            fileInfo.style.display = 'none';
-            questionsSelector.style.display = 'none';
-            generateBtn.style.display = 'none';
-            progressArea.classList.add('show');
+            // Close Mini App and send message to bot
+            const message = `רוצה ליצור מבחן עם ${selectedQuestionCount} שאלות.\n\nהעלה את הקבצים בצ'אט הרגיל ↓`;
             
-            // Send to bot via WebApp
-            const formData = new FormData();
-            uploadedFiles.forEach((file, index) => {
-                formData.append(`file${index}`, file);
+            tg.showPopup({
+                title: '📤 המשך בצ\'אט',
+                message: 'כדי להעלות קבצים, תצטרך להשתמש בצ\'אט הרגיל.\n\nהעלה את הקבצים שלך שם ואז שלח את מספר השאלות: ' + selectedQuestionCount,
+                buttons: [
+                    {id: 'ok', type: 'ok', text: 'בסדר, הבנתי'}
+                ]
+            }, (buttonId) => {
+                if (buttonId === 'ok') {
+                    // Send the question count as data
+                    tg.sendData(JSON.stringify({
+                        action: 'set_question_count',
+                        count: selectedQuestionCount
+                    }));
+                    tg.close();
+                }
             });
-            formData.append('question_count', selectedQuestionCount);
-            formData.append('user_id', tg.initDataUnsafe.user.id);
-            
-            try {
-                // Send data to bot
-                tg.sendData(JSON.stringify({
-                    files: uploadedFiles.map(f => ({name: f.name, size: f.size})),
-                    question_count: selectedQuestionCount
-                }));
-                
-                // Show success
-                progressArea.classList.remove('show');
-                resultArea.classList.add('show');
-                
-            } catch (error) {
-                tg.showAlert('אירעה שגיאה. נסה שוב.');
-                resetApp();
-            }
         });
         
         // Reset app
