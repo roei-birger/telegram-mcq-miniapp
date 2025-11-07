@@ -7,6 +7,23 @@ Render Free Plan מכניס שירותים ל"שינה" אחרי 15 דקות ח�
 
 ## 🎯 פתרונות מומלצים
 
+**עדכון חשוב:** הבוט עכשיו כולל שרת HTTP פנימי לhealth checks!
+
+### URL לניטור:
+```
+https://[YOUR-BOT-NAME].onrender.com/health
+```
+
+### תגובה צפויה:
+```json
+{
+  "status": "healthy",
+  "service": "telegram-mcq-bot", 
+  "timestamp": "2025-11-07T19:32:00Z",
+  "version": "1.0.0"
+}
+```
+
 ### אפשרות 1: UptimeRobot (הכי פופולרי!)
 
 **יתרונות:**

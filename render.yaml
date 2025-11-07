@@ -7,7 +7,7 @@ services:
     buildCommand: |
       python --version
       bash build.sh
-    startCommand: python main.py
+    startCommand: python main_web.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false  # תגדיר ידנית ב-Dashboard
@@ -39,6 +39,8 @@ services:
         value: 1
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: PORT
+        value: 10000
 
   # Redis Service
   - type: redis
