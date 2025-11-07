@@ -107,6 +107,33 @@ class GeneratorService:
         
         return None
     
+    def generate_questions_for_interactive(self, text: str = None, count: int = 10, files: List[Dict[str, Any]] = None) -> Optional[List[Question]]:
+        """
+        יצירת שאלות למבחן אינטראקטיבי
+        
+        Args:
+            text: טקסט בודד (אופציונלי)
+            count: מספר שאלות
+            files: רשימת קבצים (אופציונלי)
+        
+        Returns:
+            רשימת Question objects או None
+        """
+        try:
+            if files and len(files) > 1:
+                # מספר קבצים
+                return self._generate_questions_multi_file(files, count)
+            elif text:
+                # טקסט בודד
+                return self._generate_questions_single(text, count)
+            else:
+                logger.error("No text or files provided for interactive quiz")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error generating questions for interactive quiz: {e}")
+            return None
+    
     def _generate_questions_multi_file(self, files: List[Dict[str, Any]], total_count: int) -> Optional[List[Question]]:
         """
         יצירת שאלות ממספר קבצים באופן יחסי לגודל כל קובץ

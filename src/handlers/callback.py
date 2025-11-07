@@ -11,6 +11,8 @@ from config import config
 from services.session_service import session_service
 from services.queue_service import queue_service
 from services.file_service import file_service
+from services.interactive_quiz_service import interactive_quiz_service
+from services.generator_service import generator_service
 from utils.validators import validate_question_count
 from utils.logger import logger
 
@@ -190,6 +192,95 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
             )
             return
         
+        # טיפול במבחן אינטראקטיבי בטלגרם
+        elif callback_data.startswith("start_telegram_quiz_"):
+            try:
+                # חילוץ מספר השאלות המקורי
+                original_count = int(callback_data.split("_")[3])
+                
+                # קבלת file_data להכנת השאלות
+                file_data = session_service.get_file_data(chat_id)
+                if not file_data:
+                    query.message.reply_text("❌ הקובץ כבר לא זמין. בבקשה העלה קובץ חדש עם /start")
+                    return
+                
+                # הודעה שמתחילים
+                query.edit_message_text(
+                    "🧠 **מכין מבחן אינטראקטיבי...**\n\n⏳ יוצר שאלות לטלגרם\nזה יכול לקחת כמה שניות...",
+                    parse_mode='Markdown'
+                )
+                
+                # יצירת שאלות חדשות למבחן אינטראקטיבי (מקסימום 10 לחוויה טובה)
+                quiz_count = min(original_count, 10)
+                
+                # השתמש בגנרטור להכנת שאלות
+                if "files" in file_data and len(file_data["files"]) > 1:
+                    # מספר קבצים
+                    questions = generator_service.generate_questions_for_interactive(
+                        files=file_data["files"], 
+                        count=quiz_count
+                    )
+                else:
+                    # קובץ בודד
+                    questions = generator_service.generate_questions_for_interactive(
+                        text=file_data["text"], 
+                        count=quiz_count
+                    )
+                
+                if not questions:
+                    query.edit_message_text(
+                        "❌ **נכשל ביצירת המבחן האינטראקטיבי**\n\nנסה שוב או בחר באפשרות 'הורד כ-HTML'",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                # התחלת המבחן האינטראקטיבי
+                quiz_session = interactive_quiz_service.start_quiz(chat_id, questions, quiz_count)
+                if not quiz_session:
+                    query.edit_message_text(
+                        "❌ **שגיאה בהתחלת המבחן**\n\nנסה שוב מאוחר יותר",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                # שליחת השאלה הראשונה
+                _send_next_question(query, quiz_session)
+                
+            except (ValueError, IndexError) as e:
+                logger.error(f"Error parsing telegram quiz callback: {e}")
+                query.message.reply_text("❌ שגיאה בעיבוד הבקשה")
+                return
+        
+        # טיפול בתשובות למבחן אינטראקטיבי
+        elif callback_data.startswith("quiz_answer_"):
+            try:
+                answer_index = int(callback_data.split("_")[2])
+                
+                # שליחת התשובה ו-קבלת תוצאות
+                result = interactive_quiz_service.submit_answer(chat_id, answer_index)
+                
+                if not result["success"]:
+                    query.edit_message_text(f"❌ {result.get('error', 'שגיאה לא ידועה')}")
+                    return
+                
+                # הצגת תוצאת השאלה
+                _show_answer_result(query, result)
+                
+                # אם המבחן הסתיים, הצג סטטיסטיקות
+                if result["is_finished"]:
+                    _show_quiz_results(query, result["final_stats"])
+                else:
+                    # אחרת, שלח את השאלה הבאה אחרי 2 שניות
+                    time.sleep(2)
+                    quiz_session = interactive_quiz_service.get_quiz_session(chat_id)
+                    if quiz_session:
+                        _send_next_question(query, quiz_session)
+                
+            except (ValueError, IndexError) as e:
+                logger.error(f"Error processing quiz answer: {e}")
+                query.message.reply_text("❌ שגיאה בעיבוד התשובה")
+                return
+        
         elif callback_data == "confirm_new_quiz":
             # אישור - מחיקת כל הקבצים והתחלה מחדש
             session_service.delete_file_data(chat_id)
@@ -365,3 +456,148 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
             query.message.reply_text("❌ אירעה שגיאה. נסה שוב עם /start")
         except:
             pass
+
+
+def _send_next_question(query, quiz_session):
+    """שליחת השאלה הבאה במבחן אינטראקטיבי"""
+    try:
+        current_q_index = quiz_session.current_question
+        current_q = quiz_session.questions[current_q_index]
+        total_questions = len(quiz_session.questions)
+        
+        # יצירת כפתורים לאפשרויות
+        keyboard = []
+        for i, option in enumerate(current_q.options):
+            # הגבלת אורך הטקסט בכפתור
+            option_text = option[:35] + "..." if len(option) > 35 else option
+            keyboard.append([InlineKeyboardButton(f"{chr(65+i)}. {option_text}", callback_data=f"quiz_answer_{i}")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # טקסט השאלה עם מידע על התקדמות
+        progress = f"{current_q_index + 1}/{total_questions}"
+        difficulty_emoji = {
+            "easy": "🟢",
+            "medium": "🟡", 
+            "hard": "🔴",
+            "very_hard": "⚫"
+        }.get(current_q.difficulty, "🟡")
+        
+        question_text = f"""🧠 **מבחן אינטראקטיבי** | שאלה {progress}
+
+{difficulty_emoji} **קושי: {current_q.difficulty}**
+
+{current_q.question}
+
+בחר את התשובה הנכונה:"""
+        
+        query.edit_message_text(
+            text=question_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"Error sending next question: {e}")
+        query.message.reply_text("❌ שגיאה בשליחת השאלה. המבחן הופסק.")
+
+
+def _show_answer_result(query, result):
+    """הצגת תוצאת התשובה"""
+    try:
+        is_correct = result["is_correct"]
+        correct_answer = result["correct_answer"]
+        explanation = result["explanation"]
+        current_score = result["current_score"]
+        current_question = result["current_question"]
+        total_questions = result["total_questions"]
+        
+        # אמוג'י לפי נכונות
+        emoji = "✅" if is_correct else "❌"
+        status = "נכון!" if is_correct else "שגוי"
+        
+        # טקסט התוצאה
+        result_text = f"""{emoji} **{status}**
+
+🎯 **התשובה הנכונה:** {correct_answer}
+
+💡 **הסבר:** {explanation}
+
+📊 **ציון נוכחי:** {current_score}/{current_question} ({round((current_score/current_question)*100, 1)}%)"""
+        
+        if not result["is_finished"]:
+            result_text += f"\n\n⏳ השאלה הבאה מגיעה בעוד שנייה..."
+        
+        query.edit_message_text(
+            text=result_text,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error showing answer result: {e}")
+
+
+def _show_quiz_results(query, stats):
+    """הצגת תוצאות סופיות של המבחן"""
+    try:
+        total = stats["total_questions"]
+        correct = stats["correct_answers"]
+        wrong = stats["wrong_answers"]
+        percentage = stats["score_percentage"]
+        grade = stats["grade"]
+        grade_emoji = stats["grade_emoji"]
+        duration = stats["duration_minutes"]
+        
+        # התפלגות קושי
+        difficulty_breakdown = ""
+        for difficulty, count in stats["difficulty_stats"].items():
+            correct_count = stats["difficulty_correct"].get(difficulty, 0)
+            difficulty_emoji = {
+                "easy": "🟢",
+                "medium": "🟡",
+                "hard": "🔴", 
+                "very_hard": "⚫"
+            }.get(difficulty, "🟡")
+            
+            difficulty_breakdown += f"{difficulty_emoji} {difficulty}: {correct_count}/{count}\n"
+        
+        # יצירת כפתורים לפעולות נוספות
+        keyboard = [
+            [
+                InlineKeyboardButton("🔄 מבחן נוסף (5 שאלות)", callback_data="more_quiz_5"),
+                InlineKeyboardButton("🔄 מבחן נוסף (10 שאלות)", callback_data="more_quiz_10")
+            ],
+            [
+                InlineKeyboardButton("🧠 בחן אותי שוב", callback_data=f"start_telegram_quiz_{total}"),
+            ],
+            [
+                InlineKeyboardButton("📄 הורד מבחן HTML", callback_data="more_quiz_custom"),
+                InlineKeyboardButton("🆕 מבחן חדש", callback_data="start_new_quiz")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        results_text = f"""{grade_emoji} **{grade}**
+
+📊 **תוצאות המבחן:**
+✅ נכונות: {correct}
+❌ שגויות: {wrong}  
+🎯 ציון: {percentage}%
+⏱️ זמן: {duration} דקות
+
+📈 **פילוח לפי קושי:**
+{difficulty_breakdown.strip()}
+
+🎉 כל הכבוד! רוצה לנסות עוד?"""
+        
+        query.edit_message_text(
+            text=results_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+        logger.info(f"Quiz completed - Score: {correct}/{total} ({percentage}%)")
+        
+    except Exception as e:
+        logger.error(f"Error showing quiz results: {e}")
+        query.message.reply_text("🎉 המבחן הסתיים! תוצאות לא זמינות בשל שגיאה טכנית.")

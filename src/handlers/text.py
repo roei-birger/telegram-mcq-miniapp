@@ -108,6 +108,9 @@ def handle_text(update: Update, context: CallbackContext) -> None:
                     # יצירת כפתורים למבחן נוסף
                     keyboard = [
                         [
+                            InlineKeyboardButton("🧠 בחן אותי בטלגרם", callback_data=f"start_telegram_quiz_{count}")
+                        ],
+                        [
                             InlineKeyboardButton("🔄 מבחן נוסף (5 שאלות)", callback_data=f"more_quiz_5"),
                             InlineKeyboardButton("🔄 מבחן נוסף (10 שאלות)", callback_data=f"more_quiz_10")
                         ],
@@ -119,7 +122,7 @@ def handle_text(update: Update, context: CallbackContext) -> None:
                             InlineKeyboardButton("✏️ בחר כמות אחרת", callback_data=f"more_quiz_custom")
                         ],
                         [
-                            InlineKeyboardButton("� התחל מבחן חדש", callback_data=f"start_new_quiz")
+                            InlineKeyboardButton("🆕 התחל מבחן חדש", callback_data=f"start_new_quiz")
                         ]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
