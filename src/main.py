@@ -35,11 +35,19 @@ from handlers.health import health_check
 def main():
     """Main function - אתחול והרצת הבוט"""
     
+    # Global updater for cleanup
+    updater = None
+    
     try:
         # בדיקת configuration
         logger.info("Starting Telegram MCQ Bot...")
         config.validate()
         logger.info("Configuration validated")
+        
+        # Check if we should run the bot
+        if not config.RUN_TELEGRAM_BOT:
+            logger.info("Telegram bot is disabled (RUN_TELEGRAM_BOT=false)")
+            return
         
         # יצירת תיקיות נדרשות
         config.ensure_directories()
@@ -71,23 +79,44 @@ def main():
         logger.info("Starting background workers...")
         queue_service.start_workers(num_workers=3)
         
-        # התחלת polling
-        logger.info("🚀 Telegram MCQ Bot is running!")
-        logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
-        logger.info("Press Ctrl+C to stop")
-        
-        updater.start_polling()
-        updater.idle()
+        # Choose between webhook and polling based on environment
+        if config.USE_WEBHOOK and config.WEBHOOK_URL:
+            logger.info(f"🚀 Starting Telegram Bot with webhook: {config.WEBHOOK_URL}")
+            logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
+            
+            # Start webhook
+            updater.start_webhook(
+                listen="0.0.0.0",
+                port=config.WEBHOOK_PORT,
+                url_path=config.TELEGRAM_BOT_TOKEN,
+                webhook_url=f"{config.WEBHOOK_URL}/{config.TELEGRAM_BOT_TOKEN}"
+            )
+            updater.idle()
+            
+        else:
+            # התחלת polling
+            logger.info("🚀 Telegram MCQ Bot is running with polling!")
+            logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
+            logger.info("Press Ctrl+C to stop")
+            
+            updater.start_polling(drop_pending_updates=True)
+            updater.idle()
         
     except KeyboardInterrupt:
         logger.info("Received stop signal")
-        queue_service.stop_workers()
-        logger.info("Bot stopped")
-        sys.exit(0)
-        
     except Exception as e:
         logger.error(f"Fatal error: {e}")
-        sys.exit(1)
+        raise
+    finally:
+        # Cleanup
+        try:
+            if updater:
+                logger.info("Stopping bot...")
+                updater.stop()
+            queue_service.stop_workers()
+            logger.info("Bot stopped gracefully")
+        except Exception as cleanup_error:
+            logger.error(f"Error during cleanup: {cleanup_error}")
 
 
 if __name__ == "__main__":

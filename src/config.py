@@ -15,6 +15,12 @@ class Config:
     # Telegram Bot (חובה)
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     
+    # Bot deployment options
+    USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() == "true"
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+    WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8443"))
+    RUN_TELEGRAM_BOT = os.getenv("RUN_TELEGRAM_BOT", "true").lower() == "true"
+    
     # Google Gemini (חובה)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-pro")

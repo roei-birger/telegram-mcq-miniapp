@@ -18,10 +18,15 @@ from services.generator_service import GeneratorService, Question
 from services.html_renderer import HTMLRenderer
 from utils.logger import logger
 
-# Configure Flask app template and static folders
+# Get absolute paths for templates and static files
+current_dir = os.path.dirname(os.path.abspath(__file__))
+template_dir = os.path.join(current_dir, 'templates')
+static_dir = os.path.join(current_dir, 'static')
+
+# Configure Flask app template and static folders with absolute paths
 app = Flask(__name__,
-           template_folder='templates',
-           static_folder='static')
+           template_folder=template_dir,
+           static_folder=static_dir)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mcq-bot-secret-key-change-in-production')
 
 # Configure file uploads

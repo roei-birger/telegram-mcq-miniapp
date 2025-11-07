@@ -41,6 +41,12 @@ services:
         value: 3.11.9
       - key: PORT
         value: 10000
+      - key: RUN_TELEGRAM_BOT
+        value: "false"  # Disable telegram bot to prevent conflicts in deployment
+      - key: USE_WEBHOOK
+        value: "false"
+      - key: FLASK_SECRET_KEY
+        sync: false  # Set manually in Dashboard for production security
 
   # Redis Service
   - type: redis
