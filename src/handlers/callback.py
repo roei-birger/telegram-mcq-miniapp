@@ -204,8 +204,8 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
                     query.message.reply_text("❌ הקובץ כבר לא זמין. בבקשה העלה קובץ חדש עם /start")
                     return
                 
-                # הודעה שמתחילים
-                query.edit_message_text(
+                # הודעה שמתחילים - נשלח הודעה חדשה במקום לערוך (כי ההודעה המקורית היא document)
+                processing_msg = query.message.reply_text(
                     "🧠 **מכין מבחן אינטראקטיבי...**\n\n⏳ יוצר שאלות לטלגרם\nזה יכול לקחת כמה שניות...",
                     parse_mode='Markdown'
                 )
@@ -228,7 +228,7 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
                     )
                 
                 if not questions:
-                    query.edit_message_text(
+                    processing_msg.edit_text(
                         "❌ **נכשל ביצירת המבחן האינטראקטיבי**\n\nנסה שוב או בחר באפשרות 'הורד כ-HTML'",
                         parse_mode='Markdown'
                     )
@@ -237,14 +237,14 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
                 # התחלת המבחן האינטראקטיבי
                 quiz_session = interactive_quiz_service.start_quiz(chat_id, questions, quiz_count)
                 if not quiz_session:
-                    query.edit_message_text(
+                    processing_msg.edit_text(
                         "❌ **שגיאה בהתחלת המבחן**\n\nנסה שוב מאוחר יותר",
                         parse_mode='Markdown'
                     )
                     return
                 
                 # שליחת השאלה הראשונה
-                _send_next_question(query, quiz_session)
+                _send_next_question(processing_msg, quiz_session)
                 
             except (ValueError, IndexError) as e:
                 logger.error(f"Error parsing telegram quiz callback: {e}")
@@ -264,17 +264,18 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
                     return
                 
                 # הצגת תוצאת השאלה
-                _show_answer_result(query, result)
+                _show_answer_result(query.message, result)
                 
                 # אם המבחן הסתיים, הצג סטטיסטיקות
                 if result["is_finished"]:
-                    _show_quiz_results(query, result["final_stats"])
+                    _show_quiz_results(query.message, result["final_stats"])
                 else:
                     # אחרת, שלח את השאלה הבאה אחרי 2 שניות
                     time.sleep(2)
                     quiz_session = interactive_quiz_service.get_quiz_session(chat_id)
                     if quiz_session:
-                        _send_next_question(query, quiz_session)
+                        # עדכן את אותה הודעה עם השאלה הבאה
+                        _send_next_question(query.message, quiz_session)
                 
             except (ValueError, IndexError) as e:
                 logger.error(f"Error processing quiz answer: {e}")
@@ -458,7 +459,7 @@ def handle_callback_query(update: Update, context: CallbackContext) -> None:
             pass
 
 
-def _send_next_question(query, quiz_session):
+def _send_next_question(message, quiz_session):
     """שליחת השאלה הבאה במבחן אינטראקטיבי"""
     try:
         current_q_index = quiz_session.current_question
@@ -491,7 +492,7 @@ def _send_next_question(query, quiz_session):
 
 בחר את התשובה הנכונה:"""
         
-        query.edit_message_text(
+        message.edit_text(
             text=question_text,
             parse_mode='Markdown',
             reply_markup=reply_markup
@@ -499,10 +500,13 @@ def _send_next_question(query, quiz_session):
         
     except Exception as e:
         logger.error(f"Error sending next question: {e}")
-        query.message.reply_text("❌ שגיאה בשליחת השאלה. המבחן הופסק.")
+        try:
+            message.reply_text("❌ שגיאה בשליחת השאלה. המבחן הופסק.")
+        except:
+            pass
 
 
-def _show_answer_result(query, result):
+def _show_answer_result(message, result):
     """הצגת תוצאת התשובה"""
     try:
         is_correct = result["is_correct"]
@@ -528,7 +532,7 @@ def _show_answer_result(query, result):
         if not result["is_finished"]:
             result_text += f"\n\n⏳ השאלה הבאה מגיעה בעוד שנייה..."
         
-        query.edit_message_text(
+        message.edit_text(
             text=result_text,
             parse_mode='Markdown'
         )
@@ -537,7 +541,7 @@ def _show_answer_result(query, result):
         logger.error(f"Error showing answer result: {e}")
 
 
-def _show_quiz_results(query, stats):
+def _show_quiz_results(message, stats):
     """הצגת תוצאות סופיות של המבחן"""
     try:
         total = stats["total_questions"]
@@ -590,7 +594,7 @@ def _show_quiz_results(query, stats):
 
 🎉 כל הכבוד! רוצה לנסות עוד?"""
         
-        query.edit_message_text(
+        message.edit_text(
             text=results_text,
             parse_mode='Markdown',
             reply_markup=reply_markup
@@ -600,4 +604,4 @@ def _show_quiz_results(query, stats):
         
     except Exception as e:
         logger.error(f"Error showing quiz results: {e}")
-        query.message.reply_text("🎉 המבחן הסתיים! תוצאות לא זמינות בשל שגיאה טכנית.")
+        message.reply_text("🎉 המבחן הסתיים! תוצאות לא זמינות בשל שגיאה טכנית.")
