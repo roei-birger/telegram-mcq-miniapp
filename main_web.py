@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
 Telegram MCQ Bot - Web Service Entry Point
-Entry point that runs both the Telegram bot and a simple HTTP health server
+Entry point that runs both the Telegram bot and a Flask web interface
 """
 import sys
 import os
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
+import time
 from datetime import datetime
 
 # Add src directory to Python path
@@ -15,59 +14,62 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, 'src')
 sys.path.insert(0, src_dir)
 
-# Import and run the main function from src/main.py
+# Import modules
 import main as src_main
 
-class HealthHandler(BaseHTTPRequestHandler):
-    """Simple HTTP health check handler"""
-    
-    def do_GET(self):
-        """Handle GET requests"""
-        if self.path == '/' or self.path == '/health':
-            # Health check endpoint
-            response = {
-                'status': 'healthy',
-                'service': 'telegram-mcq-bot',
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
-                'version': '1.0.0'
-            }
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode('utf-8'))
-            
-        else:
-            # 404 for other paths
-            self.send_response(404)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'error': 'Not Found'}).encode('utf-8'))
-    
-    def log_message(self, format, *args):
-        """Suppress default logging"""
-        pass
+def run_flask_app():
+    """Run Flask web application"""
+    try:
+        # Import here to ensure src is in path
+        from web_app import app
+        
+        port = int(os.environ.get('PORT', 10000))
+        print(f"Starting Flask web app on port {port}")
+        
+        # Run Flask app
+        app.run(
+            host='0.0.0.0',
+            port=port,
+            debug=False,
+            threaded=True
+        )
+    except Exception as e:
+        print(f"Flask app error: {e}")
 
-def run_health_server():
-    """Run HTTP health check server"""
-    port = int(os.environ.get('PORT', 10000))
-    server = HTTPServer(('0.0.0.0', port), HealthHandler)
-    print(f"🌐 Health server running on port {port}")
-    server.serve_forever()
+def run_telegram_bot():
+    """Run Telegram bot"""
+    try:
+        # Small delay to let Flask start first
+        time.sleep(2)
+        print("Starting Telegram bot...")
+        src_main.main()
+    except Exception as e:
+        print(f"Telegram bot error: {e}")
 
 def main():
-    """Main entry point that runs both bot and health server"""
+    """Main entry point that runs both Flask web app and Telegram bot"""
     try:
-        # Start health server in background thread
-        health_thread = threading.Thread(target=run_health_server, daemon=True)
-        health_thread.start()
+        print("Starting MCQ Bot hybrid service")
         
-        # Run the telegram bot (this will block)
-        src_main.main()
+        # Check if we should run telegram bot (for local development)
+        run_telegram = os.environ.get('RUN_TELEGRAM_BOT', 'true').lower() == 'true'
         
+        if run_telegram:
+            print("Telegram bot will start in 3 seconds...")
+            # Start Telegram bot in background thread
+            telegram_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+            telegram_thread.start()
+        else:
+            print("Telegram bot disabled (set RUN_TELEGRAM_BOT=true to enable)")
+        
+        print("Starting Flask web interface...")
+        # Run Flask app in main thread (this will block)
+        run_flask_app()
+        
+    except KeyboardInterrupt:
+        print("Received stop signal, shutting down...")
     except Exception as e:
-        print(f"Error starting services: {e}")
+        print(f"Error starting hybrid service: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
