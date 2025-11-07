@@ -7,7 +7,6 @@ services:
     region: frankfurt  # בחר region קרוב אליך
     buildCommand: bash build.sh
     startCommand: python src/main.py
-    runtimeVersion: "3.11.9"  # כריית גרסת Python
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false  # תגדיר ידנית ב-Dashboard
