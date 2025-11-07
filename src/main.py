@@ -12,6 +12,7 @@ from src.handlers.start import start
 from src.handlers.document import handle_document
 from src.handlers.text import handle_text
 from src.handlers.callback import handle_callback_query
+from src.handlers.health import health_check
 
 
 def main():
@@ -40,6 +41,7 @@ def main():
         
         # Command handlers
         dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CommandHandler("health", health_check))
         
         # Message handlers
         dispatcher.add_handler(MessageHandler(Filters.document, handle_document))

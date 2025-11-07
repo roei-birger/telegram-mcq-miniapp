@@ -360,6 +360,12 @@ User → Telegram → Bot Handler
 - **Redis Free**: 25MB RAM
 - **חיסרון**: "cold start" אחרי 15 דקות חוסר פעילות
 
+### ⏰ למנוע Cold Starts (אופציונלי)
+הבוט נרדם אחרי 15 דקות חוסר פעילות ב-Free Plan.  
+**פתרון:** השתמש ב-[UptimeRobot](https://uptimerobot.com) (חינמי!) שישלח ping כל 5 דקות.
+
+📖 **מדריך מלא:** קרא את [KEEPALIVE.md](./KEEPALIVE.md)
+
 ---
 
 ## 🆘 תמיכה
