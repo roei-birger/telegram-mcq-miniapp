@@ -1,0 +1,44 @@
+services:
+  # Telegram Bot Service
+  - type: web
+    name: telegram-mcq-bot
+    runtime: python
+    plan: free  # או starter אם צריך יותר משאבים
+    buildCommand: bash build.sh
+    startCommand: python src/main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false  # תגדיר ידנית ב-Dashboard
+      - key: GEMINI_API_KEY
+        sync: false  # תגדיר ידנית ב-Dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: telegram-bot-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: telegram-bot-redis
+          property: port
+      - key: MAX_FILE_SIZE_MB
+        value: 15
+      - key: MAX_QUESTIONS
+        value: 50
+      - key: RATE_LIMIT_PER_10MIN
+        value: 5
+      - key: RATE_LIMIT_PER_DAY
+        value: 50
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PYTHONUNBUFFERED
+        value: 1
+
+  # Redis Service
+  - type: redis
+    name: telegram-bot-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []  # ריק = גישה רק מ-services אחרים ב-Render

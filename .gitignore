@@ -14,11 +14,14 @@ ENV/
 # Logs
 logs/
 *.log
+nohup.out
+bot.log
 
 # Temporary files
 temp/
 outputs/
 *.tmp
+*.html
 
 # IDE
 .vscode/
@@ -29,3 +32,12 @@ outputs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Render
+.render/
+render-build.sh
