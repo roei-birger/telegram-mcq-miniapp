@@ -8,8 +8,8 @@ import time
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
-from src.config import config
-from src.utils.logger import logger
+from config import config
+from utils.logger import logger
 
 
 class SessionService:

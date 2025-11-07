@@ -9,10 +9,10 @@ import threading
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from src.config import config
-from src.utils.logger import logger
-from src.services.generator_service import generator_service
-from src.services.html_renderer import html_renderer
+from config import config
+from utils.logger import logger
+from services.generator_service import generator_service
+from services.html_renderer import html_renderer
 
 
 class QueueService:

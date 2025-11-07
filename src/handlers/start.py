@@ -5,8 +5,8 @@ Start Handler
 from telegram import Update
 from telegram.ext import CallbackContext
 
-from src.services.session_service import session_service
-from src.utils.logger import logger
+from services.session_service import session_service
+from utils.logger import logger
 
 
 def start(update: Update, context: CallbackContext) -> None:

@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from PyPDF2 import PdfReader
 from docx import Document
 
-from src.utils.logger import logger
+from utils.logger import logger
 
 
 class FileService:

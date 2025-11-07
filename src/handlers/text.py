@@ -7,11 +7,11 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
-from src.config import config
-from src.services.session_service import session_service
-from src.services.queue_service import queue_service
-from src.utils.validators import validate_question_count
-from src.utils.logger import logger
+from config import config
+from services.session_service import session_service
+from services.queue_service import queue_service
+from utils.validators import validate_question_count
+from utils.logger import logger
 
 
 def handle_text(update: Update, context: CallbackContext) -> None:

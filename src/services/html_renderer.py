@@ -8,9 +8,9 @@ from typing import List, Dict, Any
 from datetime import datetime
 from html import escape
 
-from src.services.generator_service import Question
-from src.config import config
-from src.utils.logger import logger
+from services.generator_service import Question
+from config import config
+from utils.logger import logger
 
 
 class HTMLRenderer:

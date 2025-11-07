@@ -27,4 +27,4 @@ fi
 # Start bot
 echo "🤖 Starting bot..."
 export PYTHONPATH=$(pwd)
-python src/main.py
+python main.py

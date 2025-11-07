@@ -6,11 +6,11 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
-from src.config import config
-from src.services.session_service import session_service
-from src.services.file_service import file_service
-from src.utils.validators import validate_file_size, validate_file_type, validate_text_length
-from src.utils.logger import logger
+from config import config
+from services.session_service import session_service
+from services.file_service import file_service
+from utils.validators import validate_file_size, validate_file_type, validate_text_length
+from utils.logger import logger
 
 
 def handle_document(update: Update, context: CallbackContext) -> None:

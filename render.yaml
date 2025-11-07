@@ -7,7 +7,7 @@ services:
     buildCommand: |
       python --version
       bash build.sh
-    startCommand: python src/main.py
+    startCommand: python main.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false  # תגדיר ידנית ב-Dashboard

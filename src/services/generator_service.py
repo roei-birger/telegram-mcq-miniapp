@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import google.generativeai as genai
 
-from src.config import config
-from src.utils.logger import logger
+from config import config
+from utils.logger import logger
 
 
 @dataclass

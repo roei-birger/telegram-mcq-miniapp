@@ -5,25 +5,31 @@ Telegram MCQ Bot - Main Entry Point
 import sys
 import os
 
-# Add src directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 # Python 3.13 compatibility patch - must be imported before telegram
 try:
     import imghdr
-except ModuleNotFoundError:
-    import imghdr_compat  # Loads the compatibility module
+except (ModuleNotFoundError, ImportError):
+    try:
+        import imghdr_compat  # Loads the compatibility module
+    except ImportError:
+        # If we can't import the compat module, create a minimal replacement
+        class ImghdrModule:
+            @staticmethod
+            def what(file, h=None):
+                return None
+        sys.modules['imghdr'] = ImghdrModule()
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-from src.config import config
-from src.utils.logger import logger, setup_logger
-from src.services.queue_service import queue_service
-from src.handlers.start import start
-from src.handlers.document import handle_document
-from src.handlers.text import handle_text
-from src.handlers.callback import handle_callback_query
-from src.handlers.health import health_check
+# Import modules (paths should be set up by entry point)
+from config import config
+from utils.logger import logger, setup_logger
+from services.queue_service import queue_service
+from handlers.start import start
+from handlers.document import handle_document
+from handlers.text import handle_text
+from handlers.callback import handle_callback_query
+from handlers.health import health_check
 
 
 def main():

@@ -40,7 +40,7 @@ def setup_logger(name: str = "telegram_bot", log_level: str = "INFO") -> logging
     
     # File handler (אופציונלי - רק אם תיקיית logs קיימת)
     try:
-        from src.config import config
+        from config import config
         log_file = os.path.join(
             config.LOGS_DIR, 
             f"bot_{datetime.now().strftime('%Y%m%d')}.log"

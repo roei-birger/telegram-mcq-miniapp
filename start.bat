@@ -29,6 +29,6 @@ if not exist ".env" (
 REM Start bot
 echo 🤖 Starting bot...
 set PYTHONPATH=%CD%
-python src\main.py
+python main.py
 
 pause

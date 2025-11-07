@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 from datetime import datetime
 
-from src.utils.logger import logger
+from utils.logger import logger
 
 
 def health_check(update: Update, context: CallbackContext) -> None:

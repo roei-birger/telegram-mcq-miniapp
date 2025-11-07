@@ -3,7 +3,7 @@ Input validators
 פונקציות לאימות קלט מהמשתמש
 """
 from typing import Tuple
-from src.config import config
+from config import config
 
 
 def validate_file_size(file_size: int) -> Tuple[bool, str]:
