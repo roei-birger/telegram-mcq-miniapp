@@ -7,7 +7,7 @@ services:
     buildCommand: |
       python --version
       bash build.sh
-    startCommand: python main_web.py
+    startCommand: python main_web_simple.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false  # תגדיר ידנית ב-Dashboard
@@ -42,11 +42,50 @@ services:
       - key: PORT
         value: 10000
       - key: RUN_TELEGRAM_BOT
-        value: "false"  # Disable telegram bot to prevent conflicts in deployment
+        value: "false"  # Web service only - no bot conflicts
       - key: USE_WEBHOOK
         value: "false"
+      - key: WEBHOOK_URL
+        sync: false  # Set manually: https://your-app-name.onrender.com
       - key: FLASK_SECRET_KEY
         sync: false  # Set manually in Dashboard for production security
+
+  # Separate Telegram Bot Service (Web Service with Webhook)
+  - type: web
+    name: telegram-mcq-bot-worker
+    runtime: python
+    plan: free
+    buildCommand: |
+      python --version
+      bash build.sh
+    startCommand: python src/main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: telegram-bot-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: telegram-bot-redis
+          property: port
+      - key: RUN_TELEGRAM_BOT
+        value: "true"  # Bot service only
+      - key: USE_WEBHOOK
+        value: "true"  # Use webhook for production
+      - key: WEBHOOK_URL
+        sync: false  # Set to this service URL
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PYTHONUNBUFFERED
+        value: 1
 
   # Redis Service
   - type: redis

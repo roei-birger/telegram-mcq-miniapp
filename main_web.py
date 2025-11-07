@@ -23,6 +23,11 @@ def run_flask_app():
         # Import here to ensure src is in path
         from web_app import app
         
+        # Set working directory to src for template access
+        src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+        os.chdir(src_dir)
+        print(f"Changed working directory to: {os.getcwd()}")
+        
         port = int(os.environ.get('PORT', 10000))
         print(f"Starting Flask web app on port {port}")
         
@@ -35,6 +40,8 @@ def run_flask_app():
         )
     except Exception as e:
         print(f"Flask app error: {e}")
+        import traceback
+        traceback.print_exc()
 
 def run_telegram_bot():
     """Run Telegram bot"""

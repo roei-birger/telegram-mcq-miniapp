@@ -23,9 +23,38 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(current_dir, 'templates')
 static_dir = os.path.join(current_dir, 'static')
 
+# Debug: Print paths and check if templates exist
+print(f"DEBUG: Current dir: {current_dir}")
+print(f"DEBUG: Template dir: {template_dir}")
+print(f"DEBUG: Static dir: {static_dir}")
+print(f"DEBUG: Templates exist: {os.path.exists(template_dir)}")
+if os.path.exists(template_dir):
+    print(f"DEBUG: Template files: {os.listdir(template_dir)}")
+
+# Fallback paths for different deployment environments
+possible_template_paths = [
+    template_dir,  # src/templates
+    os.path.join(os.path.dirname(current_dir), 'src', 'templates'),  # ../src/templates 
+    os.path.join(current_dir, '..', 'templates'),  # ../templates
+    os.path.join(os.getcwd(), 'src', 'templates'),  # cwd/src/templates
+    os.path.join(os.getcwd(), 'templates'),  # cwd/templates
+    'templates'  # relative path as last resort
+]
+
+template_path_found = None
+for path in possible_template_paths:
+    if os.path.exists(path):
+        template_path_found = os.path.abspath(path)
+        print(f"DEBUG: Using template path: {template_path_found}")
+        break
+
+if not template_path_found:
+    print("ERROR: No template directory found!")
+    template_path_found = 'templates'  # fallback
+
 # Configure Flask app template and static folders with absolute paths
 app = Flask(__name__,
-           template_folder=template_dir,
+           template_folder=template_path_found,
            static_folder=static_dir)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mcq-bot-secret-key-change-in-production')
 
@@ -311,9 +340,46 @@ def show_quiz():
     
     return render_template('quiz.html', html_content=quiz_data['html'])
 
+@app.route('/debug-paths')
+def debug_paths():
+    """Debug endpoint to check file structure in deployment"""
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    debug_info = {
+        'current_working_dir': os.getcwd(),
+        'script_location': __file__,
+        'current_dir': current_dir,
+        'template_folder': app.template_folder,
+        'static_folder': app.static_folder,
+        'template_exists': os.path.exists(app.template_folder),
+        'static_exists': os.path.exists(app.static_folder),
+    }
+    
+    # List files in various directories
+    try:
+        debug_info['cwd_contents'] = os.listdir(os.getcwd())
+    except:
+        debug_info['cwd_contents'] = 'Error listing'
+        
+    try:
+        debug_info['current_dir_contents'] = os.listdir(current_dir)
+    except:
+        debug_info['current_dir_contents'] = 'Error listing'
+        
+    try:
+        if os.path.exists(app.template_folder):
+            debug_info['template_files'] = os.listdir(app.template_folder)
+        else:
+            debug_info['template_files'] = 'Directory not found'
+    except:
+        debug_info['template_files'] = 'Error listing'
+    
+    return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
+
 @app.route('/health')
 def health_check():
-    """Health check endpoint"""
+    """Health check endpoint for monitoring"""
     return jsonify({
         'status': 'healthy',
         'service': 'telegram-mcq-bot-web',
@@ -341,6 +407,20 @@ def server_error(e):
     return render_template('error.html',
                          error_code=500,
                          error_message='שגיאה פנימית בשרת'), 500
+
+@app.route(f'/{config.TELEGRAM_BOT_TOKEN}', methods=['POST'])
+def webhook():
+    """Handle Telegram webhook updates"""
+    if not config.USE_WEBHOOK:
+        return 'Webhook not enabled', 404
+    
+    try:
+        # This endpoint is for webhook mode only
+        # The actual telegram bot instance should handle this
+        return 'Webhook endpoint - handled by bot instance', 200
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return 'Error', 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
