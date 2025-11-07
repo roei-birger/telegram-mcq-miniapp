@@ -4,6 +4,8 @@ Callback Query Handler
 """
 import time
 import os
+import html
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
@@ -15,6 +17,32 @@ from services.interactive_quiz_service import interactive_quiz_service
 from services.generator_service import generator_service
 from utils.validators import validate_question_count
 from utils.logger import logger
+
+
+def escape_markdown_v2(text: str) -> str:
+    """
+    Escape special characters for Telegram MarkdownV2
+    """
+    # תווים שצריכים escape ב-MarkdownV2
+    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    
+    for char in special_chars:
+        text = text.replace(char, f'\\{char}')
+    
+    return text
+
+
+def safe_markdown_text(text: str) -> str:
+    """
+    יצירת טקסט בטוח עבור Markdown
+    """
+    # ניקוי תווים בעייתיים
+    text = html.unescape(text)  # המרת HTML entities
+    text = re.sub(r'[^\u0000-\u007F\u0590-\u05FF\u200C-\u200F\uFB1D-\uFB4F\s]', '', text)  # השארת רק ASCII, עברית ורווחים
+    text = text.replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]')
+    text = text.replace('`', '\\`').replace('(', '\\(').replace(')', '\\)')
+    
+    return text.strip()
 
 
 def handle_callback_query(update: Update, context: CallbackContext) -> None:
@@ -469,8 +497,10 @@ def _send_next_question(message, quiz_session):
         # יצירת כפתורים לאפשרויות
         keyboard = []
         for i, option in enumerate(current_q.options):
+            # ניקוי הטקסט לטלגרם
+            safe_option = safe_markdown_text(option)
             # הגבלת אורך הטקסט בכפתור
-            option_text = option[:35] + "..." if len(option) > 35 else option
+            option_text = safe_option[:35] + "..." if len(safe_option) > 35 else safe_option
             keyboard.append([InlineKeyboardButton(f"{chr(65+i)}. {option_text}", callback_data=f"quiz_answer_{i}")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -484,11 +514,14 @@ def _send_next_question(message, quiz_session):
             "very_hard": "⚫"
         }.get(current_q.difficulty, "🟡")
         
+        # ניקוי הטקסט לטלגרם
+        safe_question = safe_markdown_text(current_q.question)
+        
         question_text = f"""🧠 **מבחן אינטראקטיבי** | שאלה {progress}
 
 {difficulty_emoji} **קושי: {current_q.difficulty}**
 
-{current_q.question}
+{safe_question}
 
 בחר את התשובה הנכונה:"""
         
@@ -520,12 +553,16 @@ def _show_answer_result(message, result):
         emoji = "✅" if is_correct else "❌"
         status = "נכון!" if is_correct else "שגוי"
         
+        # ניקוי טקסטים לטלגרם
+        safe_correct_answer = safe_markdown_text(correct_answer)
+        safe_explanation = safe_markdown_text(explanation)
+        
         # טקסט התוצאה
         result_text = f"""{emoji} **{status}**
 
-🎯 **התשובה הנכונה:** {correct_answer}
+🎯 **התשובה הנכונה:** {safe_correct_answer}
 
-💡 **הסבר:** {explanation}
+💡 **הסבר:** {safe_explanation}
 
 📊 **ציון נוכחי:** {current_score}/{current_question} ({round((current_score/current_question)*100, 1)}%)"""
         
