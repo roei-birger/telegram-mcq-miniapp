@@ -67,8 +67,10 @@ class GeneratorService:
                 response = self.model.generate_content(
                     prompt,
                     generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=4096,  # הגדלנו כדי למנוע קיטוע
+                        temperature=0.3,  # פחות randomness ליציבות רבה יותר
+                        max_output_tokens=8192,  # הגדלנו משמעותית למניעת קיטוע
+                        top_p=0.8,  # מגביל את הדגימה לטוקנים הסבירים יותר
+                        top_k=40   # מגביל מספר הטוקנים שנבחרים
                     )
                 )
                 
@@ -217,8 +219,10 @@ class GeneratorService:
                 response = self.model.generate_content(
                     prompt,
                     generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=4096,
+                        temperature=0.3,  # פחות randomness ליציבות רבה יותר
+                        max_output_tokens=8192,  # הגדלנו משמעותית למניעת קיטוע
+                        top_p=0.8,  # מגביל את הדגימה לטוקנים הסבירים יותר
+                        top_k=40   # מגביל מספר הטוקנים שנבחרים
                     )
                 )
                 
@@ -290,29 +294,39 @@ class GeneratorService:
 6. השאלות צריכות להיות ברורות וחד-משמעיות
 7. התשובות השגויות צריכות להיות סבירות (distractors טובים)
 
-**חשוב מאוד**: החזר רק JSON תקין ומושלם, ללא טקסט נוסף לפני או אחרי.
-וודא שכל המחרוזות סגורות כראוי עם גרשיים.
+**קריטי - פורמט התשובה:**
+- החזר רק JSON תקין ושלם, ללא כל טקסט נוסף
+- וודא שכל סוגרי המחרוזות והאובייקטים סגורים כראוי  
+- אל תחתוך את הJSON באמצע - השלם הכל
+- בדוק שכל המחרוזות סגורות עם גרשיים כפולים
+- אל תכלול תווים מיוחדים שיכולים לשבש את הJSON
 
-פורמט JSON (חובה!):
+פורמט JSON חובה:
 {{
   "questions": [
     {{
-      "question": "שאלה כאן",
+      "question": "שאלה כאן (ללא גרש יחיד או תווים מיוחדים)",
       "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
       "correct_index": 0,
       "difficulty": "medium",
-      "explanation": "הסבר כאן"
+      "explanation": "הסבר כאן (ללא גרש יחיד)"
     }}
   ]
 }}
 
-החזר רק את ה-JSON, שום דבר אחר."""
+שים לב: 
+- correct_index הוא מספר 0-3 בלבד
+- difficulty הוא אחד מ: easy, medium, hard, very_hard
+- כל מחרוזת חייבת להיות עטופה בגרשיים כפולים
+- וודא שהJSON נסגר כראוי עם }} בסוף
+
+החזר רק JSON שלם ותקין, שום דבר אחר!"""
         
         return prompt
     
     def _parse_response(self, response_text: str, expected_count: int) -> Optional[List[Question]]:
         """
-        Parsing של תשובת Gemini
+        Parsing של תשובת Gemini עם שיפורים לטיפול ב-JSON לא שלם
         
         Args:
             response_text: התשובה מ-Gemini
@@ -329,10 +343,15 @@ class GeneratorService:
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
-                text = text.split("```")[1].split("```")[0].strip()
+                # חיפוש אחר code block שמכיל JSON
+                blocks = text.split("```")
+                for block in blocks:
+                    if block.strip().startswith('{') or block.strip().startswith('['):
+                        text = block.strip()
+                        break
             
             # ניקוי תווים בעייתיים
-            text = text.replace('\n', ' ').replace('\r', '')
+            text = text.replace('\n', ' ').replace('\r', '').replace('\t', ' ')
             
             # ניסיון ראשון - parse רגיל
             try:
@@ -349,20 +368,66 @@ class GeneratorService:
                 # נסה למצוא את ה-} הסוגר
                 brace_count = 0
                 end_idx = -1
+                in_string = False
+                escape_next = False
+                
                 for i in range(start_idx, len(text)):
-                    if text[i] == '{':
-                        brace_count += 1
-                    elif text[i] == '}':
-                        brace_count -= 1
-                        if brace_count == 0:
-                            end_idx = i + 1
-                            break
+                    char = text[i]
+                    
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    
+                    if char == '\\':
+                        escape_next = True
+                        continue
+                    
+                    if char == '"' and not escape_next:
+                        in_string = not in_string
+                        continue
+                    
+                    if not in_string:
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_idx = i + 1
+                                break
                 
                 if end_idx == -1:
-                    raise ValueError("Incomplete JSON object")
-                
-                text = text[start_idx:end_idx]
-                data = json.loads(text)
+                    # נסה לתקן JSON לא שלם על ידי הוספת סוגריים
+                    logger.warning("JSON seems incomplete, trying to fix...")
+                    text_to_fix = text[start_idx:]
+                    
+                    # חיפוש אחר המקום האחרון שנראה תקין
+                    last_complete_question = text_to_fix.rfind('"explanation"')
+                    if last_complete_question == -1:
+                        last_complete_question = text_to_fix.rfind('"difficulty"')
+                    if last_complete_question == -1:
+                        last_complete_question = text_to_fix.rfind('"correct_index"')
+                    
+                    if last_complete_question != -1:
+                        # מצא את סוף השדה
+                        end_field = text_to_fix.find('"', last_complete_question + 15)
+                        if end_field != -1:
+                            end_field = text_to_fix.find('"', end_field + 1)
+                            if end_field != -1:
+                                # חתוך עד לשם והוסף סוגריים
+                                text = text_to_fix[:end_field + 1] + '}]}'
+                                try:
+                                    data = json.loads(text)
+                                except:
+                                    raise ValueError("Failed to fix incomplete JSON")
+                            else:
+                                raise ValueError("Incomplete JSON object")
+                        else:
+                            raise ValueError("Incomplete JSON object")
+                    else:
+                        raise ValueError("Incomplete JSON object")
+                else:
+                    text = text[start_idx:end_idx]
+                    data = json.loads(text)
             
             if "questions" not in data:
                 logger.error("Response missing 'questions' field")
@@ -373,40 +438,51 @@ class GeneratorService:
                 try:
                     # וידוא שיש את כל השדות הנדרשים
                     if not all(key in q_data for key in ["question", "options", "correct_index"]):
-                        logger.warning(f"Question {idx + 1} missing required fields")
+                        logger.warning(f"Question {idx + 1} missing required fields, skipping")
                         continue
                     
                     # וידוא 4 אפשרויות
                     if len(q_data["options"]) != 4:
-                        logger.warning(f"Question {idx + 1} has {len(q_data['options'])} options instead of 4")
+                        logger.warning(f"Question {idx + 1} has {len(q_data['options'])} options instead of 4, skipping")
+                        continue
+                    
+                    # וידוא correct_index תקין
+                    correct_idx = int(q_data["correct_index"])
+                    if correct_idx < 0 or correct_idx >= 4:
+                        logger.warning(f"Question {idx + 1} has invalid correct_index: {correct_idx}, skipping")
                         continue
                     
                     question = Question(
                         id=f"q_{idx + 1}",
                         question=str(q_data["question"]).strip(),
                         options=[str(opt).strip() for opt in q_data["options"]],
-                        correct_index=int(q_data["correct_index"]),
+                        correct_index=correct_idx,
                         difficulty=q_data.get("difficulty", "medium"),
                         explanation=str(q_data.get("explanation", "")).strip()
                     )
                     questions.append(question)
                 except (KeyError, ValueError, TypeError) as e:
-                    logger.warning(f"Question {idx + 1} parsing error: {e}")
+                    logger.warning(f"Question {idx + 1} parsing error: {e}, skipping")
                     continue
             
             if len(questions) == 0:
                 logger.error("No valid questions parsed")
                 return None
             
-            logger.info(f"Parsed {len(questions)} valid questions out of {len(data.get('questions', []))} total")
+            logger.info(f"Successfully parsed {len(questions)} valid questions out of {len(data.get('questions', []))} total")
             return questions
             
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Response text (first 1000 chars): {response_text[:1000]}")
+            logger.error(f"JSON parsing failed after all attempts: {e}")
+            logger.error(f"Error location: line {e.lineno if hasattr(e, 'lineno') else 'unknown'}, column {e.colno if hasattr(e, 'colno') else 'unknown'}")
+            logger.debug(f"Raw response length: {len(response_text)} characters")
+            logger.debug(f"Response sample (first 500 chars): {response_text[:500]}")
+            if len(response_text) > 500:
+                logger.debug(f"Response sample (last 500 chars): {response_text[-500:]}")
             return None
         except Exception as e:
-            logger.error(f"Parsing error: {e}")
+            logger.error(f"Unexpected parsing error: {e}")
+            logger.debug(f"Response type: {type(response_text)}, length: {len(response_text) if hasattr(response_text, '__len__') else 'unknown'}")
             return None
     
     def _validate_questions(self, questions: List[Question], expected_count: int) -> bool:
