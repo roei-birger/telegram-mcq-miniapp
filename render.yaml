@@ -4,7 +4,9 @@ services:
     name: telegram-mcq-bot
     runtime: python
     plan: free  # או starter אם צריך יותר משאבים
-    buildCommand: bash build.sh
+    buildCommand: |
+      python --version
+      bash build.sh
     startCommand: python src/main.py
     envVars:
       - key: TELEGRAM_BOT_TOKEN
@@ -35,6 +37,8 @@ services:
         value: INFO
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: PYTHON_VERSION
+        value: 3.11.9
 
   # Redis Service
   - type: redis
