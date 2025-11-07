@@ -34,15 +34,21 @@ def escape_markdown_v2(text: str) -> str:
 
 def safe_markdown_text(text: str) -> str:
     """
-    יצירת טקסט בטוח עבור Markdown
+    יצירת טקסט בטוח עבור Telegram - מוחק כל עיצוב
     """
-    # ניקוי תווים בעייתיים
+    # ניקוי מוחלט - הסרת כל התווים המיוחדים
     text = html.unescape(text)  # המרת HTML entities
-    text = re.sub(r'[^\u0000-\u007F\u0590-\u05FF\u200C-\u200F\uFB1D-\uFB4F\s]', '', text)  # השארת רק ASCII, עברית ורווחים
-    text = text.replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]')
-    text = text.replace('`', '\\`').replace('(', '\\(').replace(')', '\\)')
     
-    return text.strip()
+    # הסרת תווים שיכולים לגרום לבעיות parsing
+    text = re.sub(r'[*_\[\]()~`>#+=|{}.!\\]', '', text)  # הסרה במקום escape
+    
+    # השארת רק תווים בטוחים
+    text = re.sub(r'[^\u0000-\u007F\u0590-\u05FF\u200C-\u200F\uFB1D-\uFB4F\s\u00A0-\u00FF]', '', text)
+    
+    # ניקוי רווחים מיותרים
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 
 def handle_callback_query(update: Update, context: CallbackContext) -> None:
@@ -517,9 +523,9 @@ def _send_next_question(message, quiz_session):
         # ניקוי הטקסט לטלגרם
         safe_question = safe_markdown_text(current_q.question)
         
-        question_text = f"""🧠 **מבחן אינטראקטיבי** | שאלה {progress}
+        question_text = f"""🧠 מבחן אינטראקטיבי | שאלה {progress}
 
-{difficulty_emoji} **קושי: {current_q.difficulty}**
+{difficulty_emoji} קושי: {current_q.difficulty}
 
 {safe_question}
 
@@ -527,7 +533,6 @@ def _send_next_question(message, quiz_session):
         
         message.edit_text(
             text=question_text,
-            parse_mode='Markdown',
             reply_markup=reply_markup
         )
         
@@ -558,20 +563,19 @@ def _show_answer_result(message, result):
         safe_explanation = safe_markdown_text(explanation)
         
         # טקסט התוצאה
-        result_text = f"""{emoji} **{status}**
+        result_text = f"""{emoji} {status}
 
-🎯 **התשובה הנכונה:** {safe_correct_answer}
+🎯 התשובה הנכונה: {safe_correct_answer}
 
-💡 **הסבר:** {safe_explanation}
+💡 הסבר: {safe_explanation}
 
-📊 **ציון נוכחי:** {current_score}/{current_question} ({round((current_score/current_question)*100, 1)}%)"""
+📊 ציון נוכחי: {current_score}/{current_question} ({round((current_score/current_question)*100, 1)}%)"""
         
         if not result["is_finished"]:
             result_text += f"\n\n⏳ השאלה הבאה מגיעה בעוד שנייה..."
         
         message.edit_text(
-            text=result_text,
-            parse_mode='Markdown'
+            text=result_text
         )
         
     except Exception as e:
@@ -618,22 +622,21 @@ def _show_quiz_results(message, stats):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        results_text = f"""{grade_emoji} **{grade}**
+        results_text = f"""{grade_emoji} {grade}
 
-📊 **תוצאות המבחן:**
+📊 תוצאות המבחן:
 ✅ נכונות: {correct}
 ❌ שגויות: {wrong}  
 🎯 ציון: {percentage}%
 ⏱️ זמן: {duration} דקות
 
-📈 **פילוח לפי קושי:**
+📈 פילוח לפי קושי:
 {difficulty_breakdown.strip()}
 
 🎉 כל הכבוד! רוצה לנסות עוד?"""
         
         message.edit_text(
             text=results_text,
-            parse_mode='Markdown',
             reply_markup=reply_markup
         )
         
