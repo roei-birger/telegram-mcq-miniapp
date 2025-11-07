@@ -4,7 +4,6 @@ services:
     name: telegram-mcq-bot
     runtime: python
     plan: free  # או starter אם צריך יותר משאבים
-    region: frankfurt  # בחר region קרוב אליך
     buildCommand: bash build.sh
     startCommand: python src/main.py
     envVars:
