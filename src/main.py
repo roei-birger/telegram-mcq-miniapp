@@ -3,12 +3,16 @@ Telegram MCQ Bot - Main Entry Point
 בוט טלגרם ליצירת מבחני בחירה מרובה (MCQ) באמצעות AI
 """
 import sys
+import os
+
+# Add src directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Python 3.13 compatibility patch - must be imported before telegram
 try:
     import imghdr
 except ModuleNotFoundError:
-    from src import imghdr_compat  # Loads the compatibility module
+    import imghdr_compat  # Loads the compatibility module
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
