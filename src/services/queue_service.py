@@ -229,10 +229,21 @@ class QueueService:
             
             # יצירת שאלות עם Gemini
             logger.info(f"Generating {question_count} questions for {job_id}")
-            questions = generator_service.generate_questions(text, question_count, file_info)
+            
+            try:
+                questions = generator_service.generate_questions(text, question_count, file_info)
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Resource exhausted" in error_msg:
+                    logger.error(f"Rate limit exceeded for {job_id}: {e}")
+                    self.update_job_status(job_id, "FAILED", error="השירות עמוס כרגע. אנא נסה שוב בעוד כמה דקות")
+                else:
+                    logger.error(f"Unexpected error for {job_id}: {e}")
+                    self.update_job_status(job_id, "FAILED", error="שגיאה ביצירת שאלות. אנא נסה שוב")
+                return
             
             if not questions:
-                self.update_job_status(job_id, "FAILED", error="Failed to generate questions")
+                self.update_job_status(job_id, "FAILED", error="כשל ביצירת שאלות. אנא נסה שוב")
                 return
             
             # יצירת HTML

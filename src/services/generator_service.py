@@ -4,6 +4,7 @@ Generator Service
 """
 import json
 import random
+import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import google.generativeai as genai
@@ -31,10 +32,28 @@ class GeneratorService:
         try:
             genai.configure(api_key=config.GEMINI_API_KEY)
             self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+            self.last_request_time = 0  # Track last request time for rate limiting
             logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
             raise
+    
+    def _ensure_rate_limit(self, min_interval: float = 1.0):
+        """
+        מבטיח מרווח זמן מינימלי בין בקשות לAPI
+        
+        Args:
+            min_interval: מרווח מינימלי בשניות בין בקשות
+        """
+        current_time = time.time()
+        elapsed = current_time - self.last_request_time
+        
+        if elapsed < min_interval:
+            wait_time = min_interval - elapsed
+            logger.debug(f"Rate limiting: waiting {wait_time:.2f} seconds")
+            time.sleep(wait_time)
+        
+        self.last_request_time = time.time()
     
     def generate_questions(self, text: str, count: int, file_info: Optional[Dict[str, Any]] = None) -> Optional[List[Question]]:
         """
@@ -54,58 +73,6 @@ class GeneratorService:
         
         # אחרת, יצירה רגילה מטקסט מאוחד
         return self._generate_questions_single(text, count)
-        max_retries = 3
-        
-        for attempt in range(max_retries):
-            try:
-                # בניית prompt
-                prompt = self._build_prompt(text, count)
-                
-                logger.info(f"Generating {count} questions with Gemini (attempt {attempt + 1}/{max_retries})...")
-                
-                # קריאה ל-Gemini
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.3,  # פחות randomness ליציבות רבה יותר
-                        max_output_tokens=8192,  # הגדלנו משמעותית למניעת קיטוע
-                        top_p=0.8,  # מגביל את הדגימה לטוקנים הסבירים יותר
-                        top_k=40   # מגביל מספר הטוקנים שנבחרים
-                    )
-                )
-                
-                # Parsing התשובה
-                questions = self._parse_response(response.text, count)
-                
-                if not questions:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Parse failed, retrying... ({attempt + 1}/{max_retries})")
-                        continue
-                    logger.error("Failed to parse Gemini response after all retries")
-                    return None
-                
-                # Validation
-                if not self._validate_questions(questions, count):
-                    if attempt < max_retries - 1:
-                        logger.warning(f"Validation failed, retrying... ({attempt + 1}/{max_retries})")
-                        continue
-                    logger.error("Generated questions failed validation after all retries")
-                    return None
-                
-                # ערבוב אפשרויות
-                questions = self._shuffle_options(questions)
-                
-                logger.info(f"Successfully generated {len(questions)} questions")
-                return questions
-                
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}, retrying...")
-                    continue
-                logger.error(f"Question generation failed after all retries: {e}")
-                return None
-        
-        return None
     
     def generate_questions_for_interactive(self, text: str = None, count: int = 10, files: List[Dict[str, Any]] = None) -> Optional[List[Question]]:
         """
@@ -242,6 +209,9 @@ class GeneratorService:
                 
                 logger.info(f"Generating {count} questions with Gemini (attempt {attempt + 1}/{max_retries})...")
                 
+                # מניעת חריגה מגבולות rate limiting
+                self._ensure_rate_limit(2.0)  # 2 שניות בין בקשות
+                
                 # קריאה ל-Gemini
                 response = self.model.generate_content(
                     prompt,
@@ -278,8 +248,18 @@ class GeneratorService:
                 return questions
                 
             except Exception as e:
+                # בדיקה אם זה rate limit error
+                if "429" in str(e) or "Resource exhausted" in str(e):
+                    # Exponential backoff for rate limit errors
+                    if attempt < max_retries - 1:
+                        wait_time = (2 ** attempt) * 5  # 5, 10, 20 seconds
+                        logger.warning(f"Rate limit hit (attempt {attempt + 1}), waiting {wait_time} seconds before retry...")
+                        time.sleep(wait_time)
+                        continue
+                
                 if attempt < max_retries - 1:
                     logger.warning(f"Attempt {attempt + 1} failed: {e}, retrying...")
+                    time.sleep(2)  # קצר המתנה עבור שגיאות אחרות
                     continue
                 logger.error(f"Question generation failed after all retries: {e}")
                 return None
