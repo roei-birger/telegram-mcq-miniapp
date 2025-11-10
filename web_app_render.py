@@ -459,98 +459,96 @@ def generate_quiz():
         flash('מידע חסר, אנא התחל מחדש', 'error')
         return redirect(url_for('index'))
     
-    # Add generation job to queue
+    # Add generation job to queue OR process directly
     try:
-        if not queue_service:
-            flash('שירות התורים אינו זמין - Redis נדרש', 'error')
-            return redirect(url_for('select_questions'))
-            
-        job_id = queue_service.add_job({
-            'session_id': session_id,
-            'type': 'generate_web',
-            'files': session_data['files'],
-            'question_count': session_data['question_count']
-        })
+        # Try direct processing first (like src/web_app.py)
+        logger.info(f"Web: Generating {session_data['question_count']} questions from {len(session_data['files'])} files")
         
-        # Store job ID in session
-        session_data['job_id'] = job_id
-        session_data['job_status'] = 'queued'
+        files = session_data['files']
+        question_count = session_data['question_count']
+        
+        # Generate questions directly
+        if len(files) == 1:
+            # Single file
+            questions = generator_service._generate_questions_single(
+                text=files[0]['text'],
+                count=question_count,
+                file_context=files[0]['filename']
+            )
+        else:
+            # Multiple files  
+            questions = generator_service._generate_questions_multi_file(files, question_count)
+        
+        if not questions:
+            flash('שגיאה ביצירת השאלות, אנא נסה שוב', 'error')
+            return redirect(url_for('select_questions'))
+        
+        # Generate HTML
+        metadata = {
+            'filename': ', '.join([f['filename'] for f in files]),
+            'total_words': sum(f.get('word_count', 0) for f in files),
+            'question_count': len(questions)
+        }
+        html_content = html_renderer.render_quiz(questions, metadata)
+        
+        # Store in session for display
+        session_data['generated_questions'] = questions
+        session_data['html_content'] = html_content
+        session_data['job_status'] = 'completed'
         save_session_data(session_id, session_data)
         
+        logger.info(f"Web: Successfully generated {len(questions)} questions")
+        
     except Exception as e:
-        logger.error(f"Failed to add job to queue: {e}")
-        flash('שגיאה בהפעלת יצירת המבחן', 'error')
+        logger.error(f"Failed to generate quiz: {e}")
+        flash('שגיאה ביצירת המבחן. נסה שוב או צור מבחן חדש.', 'error')
         return redirect(url_for('select_questions'))
     
-    # Render status page with polling
+    # Render result page
     try:
-        return render_template('quiz.html', session_id=session_id, job_id=job_id)
+        return render_template('quiz.html', 
+                              session_id=session_id, 
+                              html_content=html_content)
     except Exception as e:
         logger.error(f"Failed to render quiz.html: {e}")
+        # Fallback: display quiz directly in simple HTML
         return f'''
         <!DOCTYPE html>
         <html lang="he" dir="rtl">
         <head>
             <meta charset="UTF-8">
-            <title>יצירת מבחן - MCQ Bot</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>המבחן שלך - MCQ Bot</title>
             <style>
                 body {{ font-family: Arial, sans-serif; padding: 20px; direction: rtl; background: #f5f5f5; }}
-                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; text-align: center; }}
-                .spinner {{ border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 20px auto; }}
-                @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-                .status {{ margin: 20px 0; padding: 15px; background: #e3f2fd; border-radius: 5px; }}
-                #status-message {{ font-size: 18px; margin: 20px; }}
-                #result {{ margin: 20px; display: none; }}
+                .container {{ max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }}
+                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; margin: -30px -30px 30px -30px; text-align: center; }}
                 .btn {{ padding: 15px 30px; margin: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; }}
+                .btn-secondary {{ background: #6c757d; }}
+                .actions {{ text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px; }}
+                @media print {{ .actions {{ display: none; }} }}
             </style>
-            <script>
-                let pollCount = 0;
-                function checkStatus() {{
-                    if (pollCount > 60) return; // Stop after 5 minutes
-                    
-                    fetch('/status/' + '{session_id}')
-                        .then(response => response.json())
-                        .then(data => {{
-                            const statusEl = document.getElementById('status-message');
-                            const resultEl = document.getElementById('result');
-                            
-                            if (data.status === 'completed' && data.questions) {{
-                                statusEl.textContent = '✅ הושלם! המבחן מוכן';
-                                resultEl.innerHTML = data.questions;
-                                resultEl.style.display = 'block';
-                                document.querySelector('.spinner').style.display = 'none';
-                            }} else if (data.status === 'error') {{
-                                statusEl.textContent = '❌ שגיאה: ' + data.error;
-                                document.querySelector('.spinner').style.display = 'none';
-                            }} else {{
-                                statusEl.textContent = '⏳ מעבד... ' + (data.message || '');
-                                pollCount++;
-                                setTimeout(checkStatus, 5000);
-                            }}
-                        }})
-                        .catch(err => {{
-                            document.getElementById('status-message').textContent = '❌ שגיאת רשת';
-                            document.querySelector('.spinner').style.display = 'none';
-                        }});
-                }}
-                
-                // Start polling when page loads
-                window.onload = () => setTimeout(checkStatus, 2000);
-            </script>
         </head>
         <body>
             <div class="container">
-                <h1>🎯 יוצר מבחן</h1>
-                <div class="spinner"></div>
-                <div class="status">
-                    <div id="status-message">⏳ מתחיל יצירת המבחן...</div>
+                <div class="header">
+                    <h1>🎯 המבחן שלך מוכן!</h1>
+                    <p>המבחן נוצר בהצלחה באמצעות בינה מלאכותית</p>
                 </div>
-                <div id="result"></div>
-                <a href="/upload" class="btn">🔄 צור מבחן חדש</a>
+                
+                <div class="quiz-content">
+                    {html_content}
+                </div>
+                
+                <div class="actions">
+                    <button onclick="window.print()" class="btn">📄 הדפס מבחן</button>
+                    <a href="/upload" class="btn">🔄 מבחן חדש</a>
+                    <a href="/" class="btn btn-secondary">🏠 דף הבית</a>
+                </div>
             </div>
         </body>
         </html>
-        '''
+        ''', 200
 
 @app.route('/quiz')
 def show_quiz():
@@ -559,32 +557,22 @@ def show_quiz():
 
 @app.route('/status/<session_id>')
 def check_status(session_id):
-    """Check generation status"""
+    """Check generation status - now for direct processing"""
     try:
         session_data = get_session_data(session_id)
         if not session_data:
             return jsonify({'status': 'error', 'error': 'Session not found'})
         
-        job_id = session_data.get('job_id')
-        if not job_id:
-            return jsonify({'status': 'error', 'error': 'No job found'})
-        
-        # Get job status from queue service
-        if not queue_service:
-            return jsonify({'status': 'error', 'error': 'Queue service not available'})
-            
-        job_status = queue_service.get_job_status(job_id)
-        
-        if job_status == 'completed':
-            # Get generated questions
-            questions = session_data.get('generated_questions')
-            if questions:
-                html_content = html_renderer.render_questions_html(questions)
+        # Since we're doing direct processing now, check if completed
+        if session_data.get('job_status') == 'completed':
+            html_content = session_data.get('html_content')
+            if html_content:
                 return jsonify({'status': 'completed', 'questions': html_content})
         
+        # If not completed, return current status
         return jsonify({
-            'status': job_status, 
-            'message': session_data.get('status_message', '')
+            'status': session_data.get('job_status', 'processing'), 
+            'message': session_data.get('status_message', 'מעבד...')
         })
         
     except Exception as e:
