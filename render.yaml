@@ -10,12 +10,27 @@ services:
       bash build.sh
     startCommand: python main_web.py
     envVars:
+      # Critical API Keys (set manually in Dashboard)
       - key: TELEGRAM_BOT_TOKEN
-        sync: false  # תגדיר ידנית ב-Dashboard
+        sync: false  # תגדיר ידנית ב-Dashboard מ-@BotFather
       - key: GEMINI_API_KEY
-        sync: false  # תגדיר ידנית ב-Dashboard
+        sync: false  # תגדיר ידנית ב-Dashboard מ-Google AI Studio
+      - key: WEBHOOK_URL
+        sync: false  # תגדיר ידנית: https://your-app-name.onrender.com
+      - key: FLASK_SECRET_KEY
+        sync: false  # תגדיר ידנית - random 64-char string
+      
+      # Telegram Bot Configuration
+      - key: RUN_TELEGRAM_BOT
+        value: "true"  # Enable both web and telegram bot together
+      - key: USE_WEBHOOK
+        value: "true"  # Required for production telegram bot (not polling)
+      
+      # AI Model Configuration  
       - key: GEMINI_MODEL
-        value: gemini-2.0-flash
+        value: gemini-2.0-flash  # Fast and reliable model
+      
+      # Redis Connection (auto-configured from redis service)
       - key: REDIS_HOST
         fromService:
           type: redis
@@ -26,6 +41,8 @@ services:
           type: redis
           name: telegram-bot-redis
           property: port
+      
+      # System Limits
       - key: MAX_FILE_SIZE_MB
         value: 15
       - key: MAX_QUESTIONS
@@ -34,26 +51,20 @@ services:
         value: 5
       - key: RATE_LIMIT_PER_DAY
         value: 50
+      
+      # Runtime Configuration
       - key: LOG_LEVEL
-        value: INFO
+        value: INFO  # Use DEBUG for troubleshooting
       - key: PYTHONUNBUFFERED
-        value: 1
+        value: 1  # Ensure logs appear in real-time
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: PORT
-        value: 10000
-      - key: RUN_TELEGRAM_BOT
-        value: "true"  # Enable both web and telegram bot together
-      - key: USE_WEBHOOK
-        value: "true"  # Required for production telegram bot
-      - key: WEBHOOK_URL
-        sync: false  # Set manually: https://your-app-name.onrender.com
-      - key: FLASK_SECRET_KEY
-        sync: false  # Set manually in Dashboard for production security
+        value: 10000  # Web interface port
 
-  # Redis Service
+  # Redis Service for Sessions and Job Queue
   - type: redis
     name: telegram-bot-redis
-    plan: free
+    plan: free  # 25MB RAM - sufficient for sessions and job queue
     maxmemoryPolicy: noeviction
     ipAllowList: []  # ריק = גישה רק מ-services אחרים ב-Render

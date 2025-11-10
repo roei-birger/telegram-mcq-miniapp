@@ -38,64 +38,95 @@ print(f"DEBUG: Web app file location: {__file__}")
 print(f"DEBUG: Current file dir: {current_file_dir}")
 print(f"DEBUG: Working directory: {os.getcwd()}")
 
-# Try multiple possible template locations - prioritize root level for deployment
+# Enhanced template path detection for deployment environments
 possible_template_paths = [
-    '/opt/render/project/templates',                # Render specific root path (highest priority)
-    os.path.join(os.getcwd(), 'templates'),         # cwd/templates (priority)
-    os.path.join(current_file_dir, 'templates'),    # src/templates
-    os.path.join(os.getcwd(), 'src', 'templates'),  # cwd/src/templates
-    'templates',  # relative
+    # Render deployment paths (highest priority) - build.sh copies templates to root
+    '/opt/render/project/templates',                    # Root templates in Render (copied by build.sh)
+    '/opt/render/project/src/templates',                # Src templates in Render (fallback)
+    
+    # Parent directory of src (for when running from src/)
+    os.path.join(os.path.dirname(current_file_dir), 'templates'),  # ../templates from src
+    
+    # Current working directory variations (works for both local and Render)
+    os.path.join(os.getcwd(), 'templates'),             # cwd/templates
+    os.path.join(os.getcwd(), 'src', 'templates'),      # cwd/src/templates
+    
+    # Relative to current file (local development)
+    os.path.join(current_file_dir, 'templates'),        # src/templates
+    
+    # Final relative fallback
+    'templates',
 ]
 
 template_dir = None
 static_dir = None
 
+print("=== TEMPLATE PATH SEARCH ===")
 for path in possible_template_paths:
     abs_path = os.path.abspath(path)
-    if os.path.exists(abs_path) and os.path.isdir(abs_path):
-        template_dir = abs_path
-        # For static dir, check both root and src level
-        static_candidates = [
-            os.path.join(os.path.dirname(abs_path), 'static'),
-            os.path.join(os.path.dirname(abs_path), 'src', 'static')
-        ]
-        static_dir = static_candidates[0]  # Default
-        for static_path in static_candidates:
-            if os.path.exists(static_path):
-                static_dir = static_path
-                break
-        print(f"DEBUG: Found templates at: {template_dir}")
-        print(f"DEBUG: Using static at: {static_dir}")
-        break
+    exists = os.path.exists(abs_path)
+    is_dir = os.path.isdir(abs_path) if exists else False
+    print(f"  Checking: {abs_path} -> exists={exists}, is_dir={is_dir}")
+    
+    if exists and is_dir:
+        # Check if index.html exists in this directory
+        index_path = os.path.join(abs_path, 'index.html')
+        has_index = os.path.exists(index_path)
+        print(f"    Has index.html: {has_index}")
+        
+        if has_index:
+            template_dir = abs_path
+            print(f"  ✓ SELECTED: {template_dir}")
+            
+            # Find corresponding static directory
+            static_candidates = [
+                # Same level as templates
+                os.path.join(os.path.dirname(abs_path), 'static'),
+                # In src directory
+                os.path.join(current_file_dir, 'static'),
+                # Fallback to templates/../static
+                os.path.join(os.path.dirname(abs_path), 'src', 'static'),
+            ]
+            
+            for static_path in static_candidates:
+                if os.path.exists(static_path):
+                    static_dir = static_path
+                    print(f"  ✓ STATIC: {static_dir}")
+                    break
+            
+            if not static_dir:
+                # Default static to same pattern as templates
+                static_dir = os.path.join(os.path.dirname(abs_path), 'static')
+                print(f"  → DEFAULT STATIC: {static_dir}")
+            
+            break
 
 if not template_dir:
-    # Fallback
+    # Ultimate fallback - create from current file directory
     template_dir = os.path.join(current_file_dir, 'templates')
     static_dir = os.path.join(current_file_dir, 'static')
-    print(f"DEBUG: Using fallback template path: {template_dir}")
+    print(f"  → FALLBACK: templates={template_dir}, static={static_dir}")
 
-print(f"DEBUG: Final template directory: {template_dir}")
-print(f"DEBUG: Template directory exists: {os.path.exists(template_dir)}")
+print(f"\nFINAL CONFIGURATION:")
+print(f"  Template folder: {template_dir}")
+print(f"  Static folder: {static_dir}")
+print(f"  Template exists: {os.path.exists(template_dir)}")
+print(f"  Static exists: {os.path.exists(static_dir)}")
 
-# List all possible template locations and their contents for debugging
-print("=== TEMPLATE DEBUGGING ===")
-debug_paths = [
-    '/opt/render/project/templates',
-    '/opt/render/project/src/templates', 
-    os.path.join(os.getcwd(), 'templates'),
-    os.path.join(os.getcwd(), 'src', 'templates'),
-    template_dir
-]
-for debug_path in debug_paths:
-    abs_debug_path = os.path.abspath(debug_path)
-    exists = os.path.exists(abs_debug_path)
-    print(f"  {abs_debug_path}: exists={exists}")
-    if exists:
-        try:
-            files = os.listdir(abs_debug_path)
-            print(f"    Files: {files}")
-        except:
-            print("    Cannot list files")
+# Verify critical templates exist
+critical_templates = ['index.html', 'upload.html', 'questions.html', 'quiz.html', 'error.html']
+missing_templates = []
+for template in critical_templates:
+    template_path = os.path.join(template_dir, template)
+    if not os.path.exists(template_path):
+        missing_templates.append(template)
+
+if missing_templates:
+    print(f"⚠️  WARNING: Missing templates: {missing_templates}")
+else:
+    print(f"✅ All critical templates found")
+
+print("=" * 50)
 
 app = Flask(__name__,
            template_folder=template_dir,
@@ -158,13 +189,77 @@ def get_session_data(session_id: str) -> Optional[dict]:
 @app.route('/')
 def index():
     """Home page"""
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Failed to render index.html: {e}")
+        # Fallback HTML if template not found
+        return '''
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Telegram MCQ Bot</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; direction: rtl; }
+                .container { max-width: 600px; margin: 0 auto; }
+                .btn { display: inline-block; padding: 12px 24px; margin: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                .error { color: red; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🤖 Telegram MCQ Bot</h1>
+                <div class="error">⚠️ Template system error - using fallback mode</div>
+                <p>בוט ליצירת מבחני בחירה מרובה באמצעות AI</p>
+                <a href="/upload" class="btn">התחל ליצור מבחן</a>
+                <a href="/debug-paths" class="btn">מידע טכני</a>
+            </div>
+        </body>
+        </html>
+        ''', 200
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_files():
     """File upload page"""
     if request.method == 'GET':
-        return render_template('upload.html')
+        try:
+            return render_template('upload.html')
+        except Exception as e:
+            logger.error(f"Failed to render upload.html: {e}")
+            # Fallback HTML
+            return '''
+            <!DOCTYPE html>
+            <html lang="he" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>העלאת קבצים - MCQ Bot</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; direction: rtl; }
+                    .container { max-width: 600px; margin: 0 auto; }
+                    .upload-form { border: 2px dashed #ddd; padding: 30px; margin: 20px 0; }
+                    input[type="file"] { margin: 10px; padding: 10px; }
+                    .btn { display: inline-block; padding: 12px 24px; margin: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; }
+                    .error { color: red; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>העלאת קבצים</h1>
+                    <div class="error">⚠️ Template system error - using fallback mode</div>
+                    <form method="post" enctype="multipart/form-data" class="upload-form">
+                        <h3>בחר קבצים (PDF, DOCX, TXT)</h3>
+                        <input type="file" name="files" multiple accept=".pdf,.docx,.txt" required>
+                        <br>
+                        <button type="submit" class="btn">העלה קבצים</button>
+                    </form>
+                    <a href="/">חזור לדף הבית</a>
+                </div>
+            </body>
+            </html>
+            ''', 200
     
     # Handle file upload
     if 'files' not in request.files:
@@ -471,15 +566,66 @@ def debug_paths():
     
     return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 
+@app.route('/debug-path')  # Add this alias for the misspelled URL
+def debug_path_alias():
+    """Redirect misspelled debug endpoint"""
+    return redirect('/debug-paths')
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for monitoring"""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'telegram-mcq-bot-web',
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
-        'version': '1.0.0'
-    })
+    try:
+        # Check template system
+        template_status = os.path.exists(app.template_folder) if app.template_folder else False
+        
+        # Check Redis connection  
+        redis_status = False
+        try:
+            if redis_client:
+                redis_client.ping()
+                redis_status = True
+        except:
+            pass
+        
+        # Check critical templates
+        critical_templates = ['index.html', 'upload.html', 'questions.html', 'quiz.html']
+        missing_templates = []
+        for template in critical_templates:
+            template_path = os.path.join(app.template_folder, template) if app.template_folder else ''
+            if not os.path.exists(template_path):
+                missing_templates.append(template)
+        
+        health_data = {
+            'status': 'healthy',
+            'service': 'telegram-mcq-bot-web',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'version': '1.0.0',
+            'deployment_info': {
+                'template_folder': app.template_folder,
+                'template_system_working': template_status,
+                'redis_connected': redis_status,
+                'missing_templates': missing_templates,
+                'telegram_bot_enabled': config.RUN_TELEGRAM_BOT,
+                'webhook_mode': config.USE_WEBHOOK,
+                'gemini_model': config.GEMINI_MODEL
+            }
+        }
+        
+        # Set status based on critical issues
+        if missing_templates:
+            health_data['status'] = 'degraded'
+            health_data['issues'] = f'Missing templates: {", ".join(missing_templates)}'
+        
+        status_code = 200 if health_data['status'] == 'healthy' else 503
+        return jsonify(health_data), status_code
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'service': 'telegram-mcq-bot-web',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(413)
 def too_large(e):
