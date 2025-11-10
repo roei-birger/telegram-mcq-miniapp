@@ -42,22 +42,87 @@ print(f"DEBUG: Root web app file location: {__file__}")
 print(f"DEBUG: Current file dir: {current_file_dir}")
 print(f"DEBUG: Working directory: {os.getcwd()}")
 
-# Simple template detection for root-level deployment
-template_dir = os.path.join(current_file_dir, 'templates')
-static_dir = os.path.join(current_file_dir, 'static')
+# Enhanced template detection for deployment
+possible_template_paths = [
+    # If we're in /opt/render/project/src, go up to project root
+    os.path.join(os.path.dirname(current_file_dir), 'templates'),  # ../templates (from src to root)
+    
+    # Standard root-level paths
+    os.path.join(current_file_dir, 'templates'),                   # ./templates (same level as script)
+    
+    # Working directory variations
+    os.path.join(os.getcwd(), 'templates'),                       # cwd/templates
+    os.path.join(os.getcwd(), '..', 'templates'),                 # cwd/../templates
+    
+    # Hardcoded Render paths
+    '/opt/render/project/templates',                              # Direct Render path
+]
 
-print(f"DEBUG: Template directory: {template_dir}")
-print(f"DEBUG: Template directory exists: {os.path.exists(template_dir)}")
-print(f"DEBUG: Static directory: {static_dir}")
-print(f"DEBUG: Static directory exists: {os.path.exists(static_dir)}")
+template_dir = None
+static_dir = None
 
-# Verify critical templates
-if os.path.exists(template_dir):
-    template_files = os.listdir(template_dir)
-    print(f"DEBUG: Template files found: {template_files}")
-else:
-    print("WARNING: Templates directory not found - using fallback mode")
+print("=== ROOT APP TEMPLATE SEARCH ===")
+for path in possible_template_paths:
+    abs_path = os.path.abspath(path)
+    exists = os.path.exists(abs_path)
+    is_dir = os.path.isdir(abs_path) if exists else False
+    print(f"  Checking: {abs_path} -> exists={exists}, is_dir={is_dir}")
+    
+    if exists and is_dir:
+        # Check if index.html exists
+        index_path = os.path.join(abs_path, 'index.html')
+        has_index = os.path.exists(index_path)
+        print(f"    Has index.html: {has_index}")
+        
+        if has_index:
+            template_dir = abs_path
+            print(f"  ✅ SELECTED TEMPLATE DIR: {template_dir}")
+            
+            # Find static directory relative to templates
+            static_candidates = [
+                os.path.join(os.path.dirname(abs_path), 'static'),  # Same level as templates
+                os.path.join(current_file_dir, 'static'),           # Same level as script
+                os.path.join(os.getcwd(), 'static'),               # cwd/static
+            ]
+            
+            for static_path in static_candidates:
+                if os.path.exists(static_path):
+                    static_dir = static_path
+                    print(f"  ✅ SELECTED STATIC DIR: {static_dir}")
+                    break
+            
+            break
+
+if not template_dir:
+    print("⚠️  NO TEMPLATES FOUND - Using None (fallback mode)")
     template_dir = None
+
+if not static_dir:
+    # Fallback static directory
+    static_dir = os.path.join(current_file_dir, 'static')
+    print(f"  → DEFAULT STATIC: {static_dir}")
+
+print(f"\n🎯 FINAL CONFIGURATION:")
+print(f"  Template directory: {template_dir}")
+print(f"  Static directory: {static_dir}")
+print(f"  Template exists: {os.path.exists(template_dir) if template_dir else False}")
+print(f"  Static exists: {os.path.exists(static_dir) if static_dir else False}")
+
+# Verify critical templates if template_dir exists
+if template_dir and os.path.exists(template_dir):
+    template_files = os.listdir(template_dir)
+    print(f"  📄 Template files found: {template_files}")
+    
+    critical_templates = ['index.html', 'upload.html', 'questions.html', 'quiz.html']
+    missing = [t for t in critical_templates if not os.path.exists(os.path.join(template_dir, t))]
+    if missing:
+        print(f"  ⚠️  Missing templates: {missing}")
+    else:
+        print(f"  ✅ All critical templates found!")
+else:
+    print("  ⚠️  Templates directory not found - fallback mode will be used")
+
+print("=" * 50)
 
 app = Flask(__name__,
            template_folder=template_dir,
@@ -201,8 +266,165 @@ def upload_files():
             </html>
             ''', 200
     
-    # Handle file upload logic (simplified for fallback)
-    return jsonify({"status": "upload endpoint working", "fallback": True}), 200
+    # Handle file upload logic 
+    if 'files' not in request.files:
+        flash('לא נבחר קובץ', 'error')
+        return redirect(request.url)
+    
+    files = request.files.getlist('files')
+    if not files or all(f.filename == '' for f in files):
+        flash('לא נבחר קובץ', 'error')
+        return redirect(request.url)
+    
+    # Generate session ID
+    session_id = str(uuid.uuid4())
+    session['session_id'] = session_id
+    
+    processed_files = []
+    total_words = 0
+    
+    for file in files:
+        if file and file.filename != '' and allowed_file(file.filename):
+            # Save file
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{session_id}_{filename}")
+            file.save(file_path)
+            
+            try:
+                # Process file - determine MIME type from extension
+                ext = filename.lower().split('.')[-1]
+                mime_type_map = {
+                    'pdf': 'application/pdf',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'txt': 'text/plain'
+                }
+                mime_type = mime_type_map.get(ext, 'text/plain')
+                
+                text_result = file_service.extract_text(file_path, mime_type)
+                if text_result and text_result.get('text'):
+                    text = text_result['text']
+                    word_count = text_result.get('word_count', len(text.split()))
+                    processed_files.append({
+                        'filename': filename,
+                        'path': file_path,
+                        'text': text,
+                        'word_count': word_count
+                    })
+                    total_words += word_count
+                    print(f"Web: Processed {filename} - {word_count:,} words")
+                else:
+                    flash(f'לא ניתן לחלץ טקסט מקובץ {filename}', 'error')
+                    os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Error processing file {filename}: {e}")
+                flash(f'שגיאה בעיבוד קובץ {filename}', 'error')
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+        else:
+            flash(f'סוג קובץ לא נתמך: {file.filename}', 'error')
+    
+    if not processed_files:
+        flash('לא נמצאו קבצים תקינים לעיבוד', 'error')
+        return redirect(request.url)
+    
+    # Check if total text is too large
+    if total_words > 50000:
+        flash(f'הקובץ גדול מדי ({total_words:,} מילים). מקסימום: 50,000 מילים.', 'error')
+        return redirect(request.url)
+    
+    # Save session data
+    session_data = {
+        'files': processed_files,
+        'total_words': total_words,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    if not save_session_data(session_id, session_data):
+        flash('שגיאה בשמירת נתונים. השרת עמוס, נסה שוב מאוחר יותר.', 'error')
+        return redirect(url_for('index'))
+    
+    return redirect(url_for('select_questions'))
+
+@app.route('/questions', methods=['GET', 'POST'])
+def select_questions():
+    """Question count selection page"""
+    try:
+        return render_template('questions.html')
+    except Exception as e:
+        logger.error(f"Failed to render questions.html: {e}")
+        return '''
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>בחירת שאלות - MCQ Bot</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; direction: rtl; background: #f5f5f5; }
+                .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .form-group { margin: 20px 0; }
+                input[type="number"] { padding: 10px; font-size: 16px; width: 100px; }
+                .btn { padding: 15px 30px; margin: 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+                .btn:hover { background: #218838; }
+                .back-btn { background: #6c757d; }
+                .error { color: red; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🎯 בחירת מספר שאלות</h1>
+                <div class="error">⚠️ Template system running in fallback mode</div>
+                <form method="post">
+                    <div class="form-group">
+                        <label>מספר שאלות רצוי (3-50):</label><br>
+                        <input type="number" name="question_count" min="3" max="50" value="10" required>
+                    </div>
+                    <button type="submit" class="btn">🚀 צור מבחן</button>
+                </form>
+                <a href="/upload" class="btn back-btn">🔙 חזור לעלאת קבצים</a>
+            </div>
+        </body>
+        </html>
+        ''', 200
+
+@app.route('/generate')  
+def generate_quiz():
+    """Generate quiz page"""
+    return jsonify({"status": "generate endpoint working", "fallback": True}), 200
+
+@app.route('/quiz')
+def show_quiz():
+    """Quiz display page"""
+    return jsonify({"status": "quiz endpoint working", "fallback": True}), 200
+
+@app.errorhandler(413)
+def too_large(e):
+    """Handle file too large error"""
+    return jsonify({"error": f"File too large. Max size: {config.MAX_FILE_SIZE_MB}MB"}), 413
+
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 errors"""
+    return '''
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head><meta charset="UTF-8"><title>שגיאה 404</title>
+    <style>body{font-family:Arial;text-align:center;padding:50px;direction:rtl;}</style></head>
+    <body><h1>שגיאה 404</h1><p>הדף לא נמצא</p><a href="/">חזור לדף הבית</a></body>
+    </html>
+    ''', 404
+
+@app.errorhandler(500) 
+def server_error(e):
+    """Handle 500 errors"""
+    logger.error(f"Server error: {e}")
+    return '''
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head><meta charset="UTF-8"><title>שגיאה 500</title>
+    <style>body{font-family:Arial;text-align:center;padding:50px;direction:rtl;}</style></head>
+    <body><h1>שגיאה 500</h1><p>שגיאה פנימית בשרת</p><a href="/">חזור לדף הבית</a></body>
+    </html>
+    ''', 500
 
 @app.route('/health')
 def health_check():

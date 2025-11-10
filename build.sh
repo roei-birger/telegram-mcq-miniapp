@@ -12,63 +12,83 @@ pip install -r requirements.txt
 # Create necessary directories
 mkdir -p logs temp outputs
 
-# Ensure templates and static are available at root level for deployment
+# CRITICAL: Ensure templates and static are available at root level for deployment
 echo "📁 Setting up templates and static files for Render deployment..."
 echo "   Working directory: $(pwd)"
 echo "   Directory contents before copy:"
 ls -la
 
-# Copy templates from src to root (critical for template path detection)
+# First, check if we have templates in src
 if [ -d "src/templates" ]; then
     echo "   ✅ Found src/templates directory"
-    if [ ! -d "templates" ]; then
-        echo "   📁 Copying templates: src/templates → ./templates"
-        cp -r src/templates ./templates
-        echo "   ✅ Templates copied successfully"
-    else
-        echo "   ℹ️  Root templates directory already exists, removing and re-copying"
+    echo "   📄 Source template files:"
+    ls -la src/templates/
+    
+    # Remove existing root templates if they exist
+    if [ -d "templates" ]; then
+        echo "   🗑️  Removing existing root templates directory"
         rm -rf templates
-        cp -r src/templates ./templates
-        echo "   ✅ Templates re-copied successfully"
     fi
     
-    # Verify templates were copied
+    # Copy templates to root
+    echo "   📁 Copying templates: src/templates → ./templates"
+    cp -r src/templates ./templates
+    
+    # Verify templates were copied correctly
     if [ -d "templates" ]; then
-        echo "   ✅ Templates directory exists at root"
-        echo "   📄 Template files:"
+        echo "   ✅ Templates directory created at root"
+        echo "   📄 Root template files:"
         ls -la templates/
+        
+        # Check for critical templates
+        critical_templates=("index.html" "upload.html" "questions.html" "quiz.html" "error.html")
+        for template in "${critical_templates[@]}"; do
+            if [ -f "templates/$template" ]; then
+                echo "   ✅ $template exists"
+            else
+                echo "   ❌ $template MISSING!"
+            fi
+        done
     else
-        echo "   ❌ Failed to create templates directory!"
+        echo "   ❌ FAILED to create templates directory at root!"
+        exit 1
     fi
 else
-    echo "   ⚠️  src/templates directory not found!"
+    echo "   ❌ src/templates directory not found!"
     echo "   📁 Available directories in src/:"
-    ls -la src/
+    if [ -d "src" ]; then
+        ls -la src/
+    else
+        echo "   ❌ src directory not found at all!"
+        ls -la
+    fi
+    exit 1
 fi
 
-# Copy static files from src to root  
+# Copy static files
 if [ -d "src/static" ]; then
     echo "   ✅ Found src/static directory"
-    if [ ! -d "static" ]; then
-        echo "   📁 Copying static files: src/static → ./static"
-        cp -r src/static ./static
+    
+    # Remove existing root static if it exists
+    if [ -d "static" ]; then
+        echo "   🗑️  Removing existing root static directory"
+        rm -rf static
+    fi
+    
+    echo "   📁 Copying static files: src/static → ./static"
+    cp -r src/static ./static
+    
+    if [ -d "static" ]; then
         echo "   ✅ Static files copied successfully"
     else
-        echo "   ℹ️  Root static directory already exists, skipping"
+        echo "   ❌ Failed to copy static files"
     fi
 else
     echo "   ⚠️  src/static directory not found!"
 fi
 
-echo "   📁 Final directory contents:"
+# Final verification
+echo "   � Final root directory contents:"
 ls -la
-
-# Verify the setup
-echo "📋 Directory structure:"
-ls -la
-if [ -d "templates" ]; then
-    echo "  Templates directory contents:"
-    ls -la templates/
-fi
 
 echo "✅ Build completed successfully!"
