@@ -40,6 +40,7 @@ print(f"DEBUG: Working directory: {os.getcwd()}")
 
 # Try multiple possible template locations - prioritize root level for deployment
 possible_template_paths = [
+    '/opt/render/project/templates',                # Render specific root path (highest priority)
     os.path.join(os.getcwd(), 'templates'),         # cwd/templates (priority)
     os.path.join(current_file_dir, 'templates'),    # src/templates
     os.path.join(os.getcwd(), 'src', 'templates'),  # cwd/src/templates
@@ -75,6 +76,26 @@ if not template_dir:
 
 print(f"DEBUG: Final template directory: {template_dir}")
 print(f"DEBUG: Template directory exists: {os.path.exists(template_dir)}")
+
+# List all possible template locations and their contents for debugging
+print("=== TEMPLATE DEBUGGING ===")
+debug_paths = [
+    '/opt/render/project/templates',
+    '/opt/render/project/src/templates', 
+    os.path.join(os.getcwd(), 'templates'),
+    os.path.join(os.getcwd(), 'src', 'templates'),
+    template_dir
+]
+for debug_path in debug_paths:
+    abs_debug_path = os.path.abspath(debug_path)
+    exists = os.path.exists(abs_debug_path)
+    print(f"  {abs_debug_path}: exists={exists}")
+    if exists:
+        try:
+            files = os.listdir(abs_debug_path)
+            print(f"    Files: {files}")
+        except:
+            print("    Cannot list files")
 
 app = Flask(__name__,
            template_folder=template_dir,
@@ -372,6 +393,54 @@ def show_quiz():
     
     return render_template('quiz.html', html_content=quiz_data['html'])
 
+@app.route('/debug-filesystem')
+def debug_filesystem():
+    """Debug endpoint to check file system in deployment"""
+    debug_info = {
+        'current_working_directory': os.getcwd(),
+        'script_location': __file__,
+        'script_directory': os.path.dirname(__file__),
+        'flask_template_folder': app.template_folder,
+        'flask_static_folder': app.static_folder
+    }
+    
+    # Check various paths
+    paths_to_check = [
+        '/opt/render/project',
+        '/opt/render/project/templates',
+        '/opt/render/project/src',
+        '/opt/render/project/src/templates',
+        os.path.join(os.getcwd(), 'templates'),
+        os.path.join(os.getcwd(), 'src', 'templates'),
+        app.template_folder
+    ]
+    
+    path_status = {}
+    for path in paths_to_check:
+        try:
+            abs_path = os.path.abspath(path)
+            exists = os.path.exists(abs_path)
+            is_dir = os.path.isdir(abs_path) if exists else False
+            contents = []
+            if exists and is_dir:
+                try:
+                    contents = os.listdir(abs_path)
+                except:
+                    contents = ["<cannot list>"]
+            
+            path_status[path] = {
+                'absolute_path': abs_path,
+                'exists': exists,
+                'is_directory': is_dir,
+                'contents': contents[:20]  # First 20 items
+            }
+        except Exception as e:
+            path_status[path] = {'error': str(e)}
+    
+    debug_info['paths'] = path_status
+    
+    return f"<pre>{json.dumps(debug_info, indent=2, ensure_ascii=False)}</pre>"
+
 @app.route('/debug-paths')
 def debug_paths():
     """Debug endpoint to check file structure in deployment"""
@@ -420,18 +489,46 @@ def too_large(e):
 
 @app.errorhandler(404)
 def not_found(e):
-    """Handle 404 errors"""
-    return render_template('error.html', 
-                         error_code=404,
-                         error_message='הדף לא נמצא'), 404
+    """Handle 404 errors with fallback"""
+    try:
+        return render_template('error.html', 
+                             error_code=404,
+                             error_message='הדף לא נמצא'), 404
+    except:
+        # Fallback if template not found
+        return '''
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head><meta charset="UTF-8"><title>שגיאה 404</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>שגיאה 404</h1>
+            <p>הדף לא נמצא</p>
+            <a href="/">חזור לדף הבית</a>
+        </body>
+        </html>
+        ''', 404
 
 @app.errorhandler(500)
 def server_error(e):
-    """Handle 500 errors"""
+    """Handle 500 errors with fallback"""
     logger.error(f"Server error: {e}")
-    return render_template('error.html',
-                         error_code=500,
-                         error_message='שגיאה פנימית בשרת'), 500
+    try:
+        return render_template('error.html',
+                             error_code=500,
+                             error_message='שגיאה פנימית בשרת'), 500
+    except:
+        # Fallback if template not found
+        return '''
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head><meta charset="UTF-8"><title>שגיאה 500</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>שגיאה 500</h1>
+            <p>שגיאה פנימית בשרת</p>
+            <a href="/">חזור לדף הבית</a>
+        </body>
+        </html>
+        ''', 500
 
 @app.route(f'/{config.TELEGRAM_BOT_TOKEN}', methods=['POST'])
 def webhook():

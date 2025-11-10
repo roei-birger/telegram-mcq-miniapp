@@ -4,6 +4,7 @@ services:
     name: telegram-mcq-bot
     runtime: python
     plan: free  # או starter אם צריך יותר משאבים
+    rootDir: ./  # Run from project root, not src/
     buildCommand: |
       python --version
       bash build.sh
