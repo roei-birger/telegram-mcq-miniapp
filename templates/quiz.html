@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}המבחן שלך - בוט יצירת מבחני MCQ{% endblock %}
+
+{% block head %}
+<style>
+/* Additional styles for quiz display */
+.quiz-container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.quiz-content {
+    padding: 0;
+}
+
+.quiz-content iframe {
+    width: 100%;
+    min-height: 80vh;
+    border: none;
+}
+
+.quiz-actions {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.quiz-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .quiz-container {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Quiz Header -->
+        <div class="quiz-info text-center mb-4">
+            <i class="fas fa-graduation-cap fa-3x mb-3"></i>
+            <h2 class="mb-3">המבחן שלך מוכן!</h2>
+            <p class="mb-0 opacity-75">המבחן נוצר בהצלחה באמצעות בינה מלאכותית</p>
+        </div>
+
+        <!-- Quiz Container -->
+        <div class="quiz-container">
+            <!-- Quiz Content -->
+            <div class="quiz-content">
+                <!-- The HTML content will be embedded here -->
+                {{ html_content|safe }}
+            </div>
+
+            <!-- Quiz Actions -->
+            <div class="quiz-actions no-print">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-2">
+                            <i class="fas fa-tools me-2"></i>
+                            פעולות מבחן
+                        </h6>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary" onclick="window.print()">
+                                <i class="fas fa-print me-1"></i>
+                                הדפס
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="downloadQuiz()">
+                                <i class="fas fa-download me-1"></i>
+                                הורד HTML
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="shareQuiz()">
+                                <i class="fas fa-share me-1"></i>
+                                שתף
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <h6 class="mb-2">
+                            <i class="fas fa-redo me-2"></i>
+                            פעולות נוספות
+                        </h6>
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('upload_files') }}" class="btn btn-success">
+                                <i class="fas fa-plus me-1"></i>
+                                מבחן חדש
+                            </a>
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                                <i class="fas fa-home me-1"></i>
+                                דף הבית
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tips Section -->
+        <div class="row mt-5 no-print">
+            <div class="col-md-6">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            טיפים לשימוש במבחן
+                        </h6>
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                השתמש בכפתור "הצג תשובות" לבדיקת התוצאות
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                הסברים מפורטים מופיעים לכל שאלה
+                            </li>
+                            <li class="mb-0">
+                                <i class="fas fa-check text-success me-2"></i>
+                                ניתן להדפיס או לשמור את המבחן למחשב
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-telegram text-info me-2"></i>
+                            גם בטלגרם!
+                        </h6>
+                        <p class="mb-3">השירות זמין גם כבוט בטלגרם</p>
+                        <div class="d-flex align-items-center">
+                            <i class="fab fa-telegram fa-2x text-info me-3"></i>
+                            <div>
+                                <small class="text-muted d-block">חפש בטלגרם:</small>
+                                <strong>@mcq_bot</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Download quiz as HTML file
+function downloadQuiz() {
+    const quizContent = document.querySelector('.quiz-content').innerHTML;
+    const fullHtml = "<!DOCTYPE html>" +
+"<html lang='he' dir='rtl'>" +
+"<head>" +
+"    <meta charset='UTF-8'>" +
+"    <meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+"    <title>מבחן MCQ</title>" +
+"    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css' rel='stylesheet'>" +
+"    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'>" +
+"    <style>" +
+"        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }" +
+"        .container { max-width: 900px; margin: 20px auto; }" +
+"    </style>" +
+"</head>" +
+"<body>" +
+"    <div class='container'>" +
+        quizContent +
+"    </div>" +
+"    <scr" + "ipt src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></scr" + "ipt>" +
+"</body>" +
+"</html>";
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'mcq-quiz-' + new Date().toISOString().split('T')[0] + '.html';
+    link.click();
+}
+
+// Share quiz (copy link or show share options)
+function shareQuiz() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'מבחן MCQ',
+            text: 'מבחן בחירה מרובה שנוצר באמצעות AI',
+            url: window.location.href
+        }).catch(err => console.log('Error sharing:', err));
+    } else {
+        // Fallback - copy URL to clipboard
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            alert('הקישור הועתק ללוח!');
+        }).catch(() => {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = window.location.href;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('הקישור הועתק ללוח!');
+        });
+    }
+}
+
+// Print optimization
+window.addEventListener('beforeprint', function() {
+    document.body.classList.add('printing');
+});
+
+window.addEventListener('afterprint', function() {
+    document.body.classList.remove('printing');
+});
+</script>
+{% endblock %}

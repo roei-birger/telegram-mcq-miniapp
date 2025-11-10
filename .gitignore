@@ -21,7 +21,9 @@ bot.log
 temp/
 outputs/
 *.tmp
-*.html
+# Only ignore generated HTML files, not templates
+outputs/*.html
+temp/*.html
 
 # IDE
 .vscode/

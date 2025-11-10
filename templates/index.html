@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}בוט יצירת מבחני MCQ - דף הבית{% endblock %}
+
+{% block content %}
+<div class="hero-section text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="hero-content">
+                <i class="fas fa-graduation-cap fa-4x text-primary mb-4"></i>
+                <h1 class="display-4 fw-bold mb-4">בוט יצירת מבחני MCQ</h1>
+                <p class="lead mb-4">
+                    יצירת מבחני בחירה מרובה באמצעות בינה מלאכותית<br>
+                    העלה קובץ PDF, DOCX או TXT וקבל מבחן איכותי תוך דקות
+                </p>
+                <div class="d-grid d-md-block">
+                    <a href="{{ url_for('upload_files') }}" class="btn btn-primary btn-lg px-5 me-md-3 mb-3 mb-md-0">
+                        <i class="fas fa-upload me-2"></i>
+                        התחל עכשיו
+                    </a>
+                    <a href="#features" class="btn btn-outline-primary btn-lg px-5">
+                        <i class="fas fa-info-circle me-2"></i>
+                        למידע נוסף
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<section id="features" class="py-5">
+    <div class="row">
+        <div class="col-12 mb-5">
+            <h2 class="text-center mb-5">
+                <i class="fas fa-star text-warning me-2"></i>
+                תכונות המערכת
+            </h2>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Feature 1 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-file-upload fa-3x text-primary"></i>
+                    </div>
+                    <h5 class="card-title">עלאת קבצים קלה</h5>
+                    <p class="card-text">תמיכה ב-PDF, DOCX ו-TXT עד 15MB</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-brain fa-3x text-success"></i>
+                    </div>
+                    <h5 class="card-title">AI מתקדם</h5>
+                    <p class="card-text">Google Gemini ליצירת שאלות איכותיות</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-sliders-h fa-3x text-info"></i>
+                    </div>
+                    <h5 class="card-title">התאמה אישית</h5>
+                    <p class="card-text">בחירת מספר שאלות ורמת קושי</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="feature-icon mb-3">
+                        <i class="fas fa-mobile-alt fa-3x text-warning"></i>
+                    </div>
+                    <h5 class="card-title">רספונסיבי</h5>
+                    <p class="card-text">עובד מושלם על מחשב וסמארטפון</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How it works -->
+<section class="py-5 bg-light rounded">
+    <div class="row">
+        <div class="col-12 mb-5">
+            <h2 class="text-center mb-5">
+                <i class="fas fa-cogs text-primary me-2"></i>
+                איך זה עובד?
+            </h2>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Step 1 -->
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="step-circle bg-primary text-white mb-3">
+                    <span class="fs-3 fw-bold">1</span>
+                </div>
+                <h5>העלה קובץ</h5>
+                <p class="text-muted">העלה קובץ PDF, DOCX או TXT עם החומר ללמידה</p>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="step-circle bg-success text-white mb-3">
+                    <span class="fs-3 fw-bold">2</span>
+                </div>
+                <h5>בחר מספר שאלות</h5>
+                <p class="text-muted">קבע כמה שאלות תרצה במבחן (3-50)</p>
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="step-circle bg-info text-white mb-3">
+                    <span class="fs-3 fw-bold">3</span>
+                </div>
+                <h5>קבל מבחן מוכן</h5>
+                <p class="text-muted">המערכת תיצור מבחן איכותי עם תשובות והסברים</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="py-5">
+    <div class="row text-center">
+        <div class="col-md-3">
+            <div class="stat-item">
+                <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                <h4 class="fw-bold">PDF, DOCX, TXT</h4>
+                <p class="text-muted">סוגי קבצים נתמכים</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <i class="fas fa-question-circle fa-2x text-success mb-2"></i>
+                <h4 class="fw-bold">3-50</h4>
+                <p class="text-muted">שאלות במבחן</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                <h4 class="fw-bold">< 2 דקות</h4>
+                <p class="text-muted">זמן יצירת מבחן</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-item">
+                <i class="fas fa-award fa-2x text-warning mb-2"></i>
+                <h4 class="fw-bold">100%</h4>
+                <p class="text-muted">חינם לשימוש</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Telegram CTA -->
+<section class="py-5 bg-primary text-white rounded">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h3 class="mb-3">
+                <i class="fab fa-telegram me-2"></i>
+                גם בטלגרם!
+            </h3>
+            <p class="mb-0">השירות זמין גם כבוט בטלגרם לנוחיות מקסימלית</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="telegram-info">
+                <small class="d-block opacity-75">חפש בטלגרם:</small>
+                <strong>@mcq_bot</strong>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add smooth scrolling
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelector(this.getAttribute('href')).scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+    });
+</script>
+{% endblock %}

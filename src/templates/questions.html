@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}בחירת מספר שאלות - בוט יצירת מבחני MCQ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Page Header -->
+        <div class="text-center mb-5">
+            <i class="fas fa-question-circle fa-3x text-success mb-3"></i>
+            <h2>בחירת מספר שאלות</h2>
+            <p class="text-muted">קבע כמה שאלות תרצה במבחן שלך</p>
+        </div>
+
+        <!-- Files Summary -->
+        <div class="card mb-4 border-0 bg-light">
+            <div class="card-body p-4">
+                <h6 class="card-title">
+                    <i class="fas fa-file-check text-success me-2"></i>
+                    קבצים שעובדו בהצלחה
+                </h6>
+                <div class="row">
+                    {% for file in files %}
+                    <div class="col-md-6 mb-2">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-alt text-primary me-2"></i>
+                            <div>
+                                <strong>{{ file.filename }}</strong>
+                                <small class="text-muted d-block">{{ "{:,}".format(file.word_count) }} מילים</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <hr class="my-3">
+                <div class="text-center">
+                    <span class="badge bg-primary fs-6 px-3 py-2">
+                        <i class="fas fa-calculator me-2"></i>
+                        סה"כ: {{ "{:,}".format(total_words) }} מילים
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Question Count Selection -->
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <form method="POST" id="questionForm">
+                    <div class="mb-4">
+                        <label for="question_count" class="form-label fs-5 fw-bold">
+                            <i class="fas fa-sliders-h me-2"></i>
+                            מספר שאלות במבחן
+                        </label>
+                        
+                        <!-- Recommended Amount -->
+                        <div class="alert alert-info d-flex align-items-center mb-3">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            <div>
+                                <strong>המלצה:</strong> על בסיס אורך הטקסט, אנו ממליצים על <strong>{{ recommended }}</strong> שאלות
+                            </div>
+                        </div>
+
+                        <!-- Number Input -->
+                        <div class="input-group input-group-lg">
+                            <input type="number" 
+                                   class="form-control text-center fs-4 fw-bold" 
+                                   id="question_count" 
+                                   name="question_count" 
+                                   value="{{ recommended }}"
+                                   min="3" 
+                                   max="50" 
+                                   required>
+                            <span class="input-group-text">שאלות</span>
+                        </div>
+                        
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            ניתן לבחור בין 3 ל-50 שאלות
+                        </div>
+
+                        <!-- Quick Selection Buttons -->
+                        <div class="mt-4">
+                            <label class="form-label fw-bold">בחירה מהירה:</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="5">5 שאלות</button>
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="10">10 שאלות</button>
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="15">15 שאלות</button>
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="20">20 שאלות</button>
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="25">25 שאלות</button>
+                                <button type="button" class="btn btn-outline-secondary quick-select" data-value="50">50 שאלות</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Difficulty Info -->
+                    <div class="alert alert-light border">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            התפלגות רמות קושי
+                        </h6>
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <div class="difficulty-item">
+                                    <i class="fas fa-smile text-success"></i>
+                                    <small class="d-block">קלות</small>
+                                    <strong>10%</strong>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="difficulty-item">
+                                    <i class="fas fa-meh text-warning"></i>
+                                    <small class="d-block">בינוניות</small>
+                                    <strong>20%</strong>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="difficulty-item">
+                                    <i class="fas fa-frown text-danger"></i>
+                                    <small class="d-block">קשות</small>
+                                    <strong>40%</strong>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="difficulty-item">
+                                    <i class="fas fa-fire text-dark"></i>
+                                    <small class="d-block">מאתגרות</small>
+                                    <strong>30%</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('upload_files') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-arrow-right me-2"></i>
+                            חזור לעלאת קבצים
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-magic me-2"></i>
+                            צור מבחן
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Time Estimation -->
+        <div class="card mt-4 border-0 bg-light">
+            <div class="card-body p-4">
+                <h6 class="card-title">
+                    <i class="fas fa-clock text-info me-2"></i>
+                    הערכת זמן יצירה
+                </h6>
+                <p class="mb-0 text-muted">
+                    יצירת המבחן תיקח בין 30 שניות לדקה וחצי, בהתאם למספר השאלות ואורך הטקסט.
+                    אנא המתן בסבלנות...
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const questionInput = document.getElementById('question_count');
+    const quickSelectButtons = document.querySelectorAll('.quick-select');
+    const form = document.getElementById('questionForm');
+
+    // Quick select button handlers
+    quickSelectButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const value = this.getAttribute('data-value');
+            questionInput.value = value;
+            updateActiveButton(value);
+        });
+    });
+
+    // Input change handler
+    questionInput.addEventListener('input', function() {
+        updateActiveButton(this.value);
+    });
+
+    // Form submit handler
+    form.addEventListener('submit', function() {
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>יוצר מבחן...';
+        
+        // Show loading message
+        const loadingAlert = document.createElement('div');
+        loadingAlert.className = 'alert alert-info mt-3';
+        loadingAlert.innerHTML = `
+            <i class="fas fa-cog fa-spin me-2"></i>
+            <strong>יוצר מבחן...</strong> המערכת מייצרת שאלות באמצעות AI, אנא המתן...
+        `;
+        form.appendChild(loadingAlert);
+    });
+
+    function updateActiveButton(value) {
+        quickSelectButtons.forEach(btn => {
+            if (btn.getAttribute('data-value') === value) {
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-secondary');
+            } else {
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
+    }
+
+    // Initialize active button
+    updateActiveButton(questionInput.value);
+});
+</script>
+{% endblock %}
