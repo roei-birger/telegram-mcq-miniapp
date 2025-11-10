@@ -83,15 +83,27 @@ def main():
         if config.USE_WEBHOOK and config.WEBHOOK_URL:
             logger.info(f"🚀 Starting Telegram Bot with webhook: {config.WEBHOOK_URL}")
             logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
+            logger.info("Webhook will be handled by Flask web app")
             
-            # Start webhook
-            updater.start_webhook(
-                listen="0.0.0.0",
-                port=config.WEBHOOK_PORT,
-                url_path=config.TELEGRAM_BOT_TOKEN,
-                webhook_url=f"{config.WEBHOOK_URL}/{config.TELEGRAM_BOT_TOKEN}"
+            # Set webhook URL
+            updater.bot.set_webhook(
+                url=f"{config.WEBHOOK_URL}/{config.TELEGRAM_BOT_TOKEN}",
+                max_connections=100,
+                allowed_updates=['message', 'callback_query']
             )
-            updater.idle()
+            
+            logger.info("Webhook URL set successfully")
+            
+            # Set the updater in web_app for webhook processing
+            try:
+                from web_app import set_telegram_updater
+                set_telegram_updater(updater)
+                logger.info("Telegram updater set in web app")
+            except ImportError:
+                logger.warning("Could not import web_app to set updater")
+            
+            # Return the updater so main_web.py can manage it
+            return updater
             
         else:
             # התחלת polling

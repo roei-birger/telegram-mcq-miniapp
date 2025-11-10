@@ -3,6 +3,7 @@ Flask Web Application for MCQ Generation
 ממשק אינטרנטי ליצירת מבחני בחירה מרובה
 """
 import os
+import sys
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -11,6 +12,11 @@ from werkzeug.utils import secure_filename
 import redis
 import json
 
+# Add src to Python path if needed
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 # Import existing services
 from config import config
 from services.file_service import FileService
@@ -18,44 +24,18 @@ from services.generator_service import GeneratorService, Question
 from services.html_renderer import HTMLRenderer
 from utils.logger import logger
 
-# Get absolute paths for templates and static files
-current_dir = os.path.dirname(os.path.abspath(__file__))
-template_dir = os.path.join(current_dir, 'templates')
-static_dir = os.path.join(current_dir, 'static')
+# Global telegram updater for webhook processing
+telegram_updater = None
 
-# Debug: Print paths and check if templates exist
-print(f"DEBUG: Current dir: {current_dir}")
-print(f"DEBUG: Template dir: {template_dir}")
-print(f"DEBUG: Static dir: {static_dir}")
-print(f"DEBUG: Templates exist: {os.path.exists(template_dir)}")
-if os.path.exists(template_dir):
-    print(f"DEBUG: Template files: {os.listdir(template_dir)}")
+def set_telegram_updater(updater):
+    """Set the telegram updater for webhook processing"""
+    global telegram_updater
+    telegram_updater = updater
 
-# Fallback paths for different deployment environments
-possible_template_paths = [
-    template_dir,  # src/templates
-    os.path.join(os.path.dirname(current_dir), 'src', 'templates'),  # ../src/templates 
-    os.path.join(current_dir, '..', 'templates'),  # ../templates
-    os.path.join(os.getcwd(), 'src', 'templates'),  # cwd/src/templates
-    os.path.join(os.getcwd(), 'templates'),  # cwd/templates
-    'templates'  # relative path as last resort
-]
-
-template_path_found = None
-for path in possible_template_paths:
-    if os.path.exists(path):
-        template_path_found = os.path.abspath(path)
-        print(f"DEBUG: Using template path: {template_path_found}")
-        break
-
-if not template_path_found:
-    print("ERROR: No template directory found!")
-    template_path_found = 'templates'  # fallback
-
-# Configure Flask app template and static folders with absolute paths
+# Configure Flask app template and static folders
 app = Flask(__name__,
-           template_folder=template_path_found,
-           static_folder=static_dir)
+           template_folder='templates',
+           static_folder='static')
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mcq-bot-secret-key-change-in-production')
 
 # Configure file uploads
@@ -183,6 +163,11 @@ def upload_files():
         flash('לא נמצאו קבצים תקינים לעיבוד', 'error')
         return redirect(request.url)
     
+    # Check if total text is too large (more than ~50K words = ~300KB text)
+    if total_words > 50000:
+        flash(f'הקובץ גדול מדי ({total_words:,} מילים). מקסימום: 50,000 מילים. אנא חלק לקבצים קטנים יותר.', 'error')
+        return redirect(request.url)
+    
     # Save session data
     session_data = {
         'files': processed_files,
@@ -191,9 +176,9 @@ def upload_files():
     }
     
     if not save_session_data(session_id, session_data):
-        # Fallback to Flask session if Redis unavailable
-        session['files'] = processed_files
-        session['total_words'] = total_words
+        # DO NOT fallback to Flask session for large data - reject instead
+        flash('שגיאה בשמירת נתונים. השרת עמוס, נסה שוב מאוחר יותר.', 'error')
+        return redirect(url_for('index'))
     
     return redirect(url_for('select_questions'))
 
@@ -205,13 +190,12 @@ def select_questions():
         flash('סשן פג תוקף, אנא התחל מחדש', 'error')
         return redirect(url_for('index'))
     
-    # Get session data
-    session_data = get_session_data(session_id) or {
-        'files': session.get('files', []),
-        'total_words': session.get('total_words', 0)
-    }
+    # Get session data (do not fallback to Flask session)
+    session_data = get_session_data(session_id)
     
-    if not session_data.get('files'):
+    if not session_data or not session_data.get('files'):
+        flash('נתוני הסשן פגו או לא נמצאו. אנא התחל מחדש.', 'error')
+        return redirect(url_for('index'))
         flash('לא נמצאו קבצים, אנא התחל מחדש', 'error')
         return redirect(url_for('index'))
     
@@ -240,7 +224,8 @@ def select_questions():
         # Update session data
         session_data['question_count'] = question_count
         if not save_session_data(session_id, session_data):
-            session['question_count'] = question_count
+            flash('שגיאה בעדכון נתונים. אנא נסה שוב.', 'error')
+            return redirect(request.url)
         
         return redirect(url_for('generate_quiz'))
         
@@ -256,11 +241,12 @@ def generate_quiz():
         flash('סשן פג תוקף, אנא התחל מחדש', 'error')
         return redirect(url_for('index'))
     
-    # Get session data
-    session_data = get_session_data(session_id) or {
-        'files': session.get('files', []),
-        'question_count': session.get('question_count', 0)
-    }
+    # Get session data (no fallback to Flask session)
+    session_data = get_session_data(session_id)
+    
+    if not session_data:
+        flash('נתוני הסשן פגו. אנא התחל מחדש.', 'error')
+        return redirect(url_for('index'))
     
     files = session_data.get('files', [])
     question_count = session_data.get('question_count', 0)
@@ -305,7 +291,8 @@ def generate_quiz():
         
         session_data['quiz'] = quiz_data
         if not save_session_data(session_id, session_data):
-            session['quiz'] = quiz_data
+            flash('שגיאה בשמירת המבחן. אנא נסה שוב.', 'error')
+            return redirect(url_for('index'))
         
         # Clean up uploaded files
         for file in files:
@@ -328,10 +315,12 @@ def show_quiz():
         flash('סשן פג תוקף, אנא התחל מחדש', 'error')
         return redirect(url_for('index'))
     
-    # Get session data
-    session_data = get_session_data(session_id) or {
-        'quiz': session.get('quiz', {})
-    }
+    # Get session data (no fallback to Flask session)
+    session_data = get_session_data(session_id)
+    
+    if not session_data or 'quiz' not in session_data:
+        flash('המבחן לא נמצא או פג תוקפו. אנא צור מבחן חדש.', 'error')
+        return redirect(url_for('index'))
     
     quiz_data = session_data.get('quiz', {})
     if not quiz_data:
@@ -344,36 +333,27 @@ def show_quiz():
 def debug_paths():
     """Debug endpoint to check file structure in deployment"""
     import os
-    current_dir = os.path.dirname(os.path.abspath(__file__))
     
     debug_info = {
-        'current_working_dir': os.getcwd(),
+        'working_dir': os.getcwd(),
         'script_location': __file__,
-        'current_dir': current_dir,
         'template_folder': app.template_folder,
-        'static_folder': app.static_folder,
-        'template_exists': os.path.exists(app.template_folder),
-        'static_exists': os.path.exists(app.static_folder),
+        'templates_exist': os.path.exists('templates'),
+        'static_exist': os.path.exists('static'),
     }
     
-    # List files in various directories
     try:
-        debug_info['cwd_contents'] = os.listdir(os.getcwd())
+        debug_info['dir_contents'] = os.listdir('.')
     except:
-        debug_info['cwd_contents'] = 'Error listing'
+        debug_info['dir_contents'] = 'Error listing'
         
     try:
-        debug_info['current_dir_contents'] = os.listdir(current_dir)
-    except:
-        debug_info['current_dir_contents'] = 'Error listing'
-        
-    try:
-        if os.path.exists(app.template_folder):
-            debug_info['template_files'] = os.listdir(app.template_folder)
+        if os.path.exists('templates'):
+            debug_info['template_files'] = os.listdir('templates')
         else:
-            debug_info['template_files'] = 'Directory not found'
+            debug_info['template_files'] = 'templates dir not found'
     except:
-        debug_info['template_files'] = 'Error listing'
+        debug_info['template_files'] = 'Error listing templates'
     
     return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 
@@ -415,12 +395,25 @@ def webhook():
         return 'Webhook not enabled', 404
     
     try:
-        # This endpoint is for webhook mode only
-        # The actual telegram bot instance should handle this
-        return 'Webhook endpoint - handled by bot instance', 200
+        if telegram_updater is None:
+            logger.warning("Telegram updater not set")
+            return 'Bot not ready', 503
+            
+        # Get the JSON data from request
+        update_data = request.get_json(force=True)
+        
+        # Process the update using the telegram updater
+        from telegram import Update
+        update = Update.de_json(update_data, telegram_updater.bot)
+        
+        if update:
+            telegram_updater.dispatcher.process_update(update)
+        
+        return 'OK', 200
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return 'Error', 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

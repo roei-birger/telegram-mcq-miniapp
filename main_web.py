@@ -49,9 +49,22 @@ def run_telegram_bot():
         # Small delay to let Flask start first
         time.sleep(2)
         print("Starting Telegram bot...")
-        src_main.main()
+        updater = src_main.main()
+        
+        # If webhook mode, keep the thread alive for background workers
+        if updater and hasattr(updater, 'dispatcher'):
+            print("Telegram bot initialized with webhook mode")
+            # Keep this thread alive to process background jobs
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("Telegram bot thread stopping...")
+        
     except Exception as e:
         print(f"Telegram bot error: {e}")
+        import traceback
+        traceback.print_exc()
 
 def main():
     """Main entry point that runs both Flask web app and Telegram bot"""
