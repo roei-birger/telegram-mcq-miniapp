@@ -32,10 +32,18 @@ def set_telegram_updater(updater):
     global telegram_updater
     telegram_updater = updater
 
-# Configure Flask app template and static folders
+# Configure Flask app template and static folders with absolute paths
+current_file_dir = os.path.dirname(os.path.abspath(__file__))
+template_dir = os.path.join(current_file_dir, 'templates')
+static_dir = os.path.join(current_file_dir, 'static')
+
+print(f"DEBUG: Web app file location: {__file__}")
+print(f"DEBUG: Template directory: {template_dir}")
+print(f"DEBUG: Templates exist: {os.path.exists(template_dir)}")
+
 app = Flask(__name__,
-           template_folder='templates',
-           static_folder='static')
+           template_folder=template_dir,
+           static_folder=static_dir)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mcq-bot-secret-key-change-in-production')
 
 # Configure file uploads
@@ -338,8 +346,9 @@ def debug_paths():
         'working_dir': os.getcwd(),
         'script_location': __file__,
         'template_folder': app.template_folder,
-        'templates_exist': os.path.exists('templates'),
-        'static_exist': os.path.exists('static'),
+        'static_folder': app.static_folder,
+        'template_folder_exists': os.path.exists(app.template_folder),
+        'static_folder_exists': os.path.exists(app.static_folder),
     }
     
     try:
@@ -348,12 +357,13 @@ def debug_paths():
         debug_info['dir_contents'] = 'Error listing'
         
     try:
-        if os.path.exists('templates'):
-            debug_info['template_files'] = os.listdir('templates')
+        debug_info['template_abs_path'] = os.path.abspath(app.template_folder)
+        if os.path.exists(app.template_folder):
+            debug_info['template_files'] = os.listdir(app.template_folder)
         else:
             debug_info['template_files'] = 'templates dir not found'
-    except:
-        debug_info['template_files'] = 'Error listing templates'
+    except Exception as e:
+        debug_info['template_files'] = f'Error: {e}'
     
     return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 

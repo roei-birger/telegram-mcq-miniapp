@@ -32,7 +32,7 @@ from handlers.callback import handle_callback_query
 from handlers.health import health_check
 
 
-def main():
+def main(run_as_thread=False):
     """Main function - אתחול והרצת הבוט"""
     
     # Global updater for cleanup
@@ -109,10 +109,15 @@ def main():
             # התחלת polling
             logger.info("🚀 Telegram MCQ Bot is running with polling!")
             logger.info(f"Using Google Gemini ({config.GEMINI_MODEL})")
-            logger.info("Press Ctrl+C to stop")
             
             updater.start_polling(drop_pending_updates=True)
-            updater.idle()
+            
+            if not run_as_thread:
+                logger.info("Press Ctrl+C to stop")
+                updater.idle()
+            else:
+                logger.info("Bot running as thread, no idle()")
+                return updater
         
     except KeyboardInterrupt:
         logger.info("Received stop signal")

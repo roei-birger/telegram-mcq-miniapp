@@ -23,11 +23,7 @@ def run_flask_app():
         # Import here to ensure src is in path
         from web_app import app
         
-        # Set working directory to src for template access
-        src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
-        os.chdir(src_dir)
-        print(f"Changed working directory to: {os.getcwd()}")
-        
+        # Don't change working directory - keep templates relative to web_app.py
         port = int(os.environ.get('PORT', 10000))
         print(f"Starting Flask web app on port {port}")
         
@@ -49,17 +45,19 @@ def run_telegram_bot():
         # Small delay to let Flask start first
         time.sleep(2)
         print("Starting Telegram bot...")
-        updater = src_main.main()
+        updater = src_main.main(run_as_thread=True)
         
-        # If webhook mode, keep the thread alive for background workers
-        if updater and hasattr(updater, 'dispatcher'):
-            print("Telegram bot initialized with webhook mode")
+        # If we got an updater back, keep the thread alive
+        if updater:
+            print("Telegram bot initialized successfully")
             # Keep this thread alive to process background jobs
             try:
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
                 print("Telegram bot thread stopping...")
+                if hasattr(updater, 'stop'):
+                    updater.stop()
         
     except Exception as e:
         print(f"Telegram bot error: {e}")
