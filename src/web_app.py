@@ -32,14 +32,39 @@ def set_telegram_updater(updater):
     global telegram_updater
     telegram_updater = updater
 
-# Configure Flask app template and static folders with absolute paths
+# Configure Flask app template and static folders with robust path detection
 current_file_dir = os.path.dirname(os.path.abspath(__file__))
-template_dir = os.path.join(current_file_dir, 'templates')
-static_dir = os.path.join(current_file_dir, 'static')
-
 print(f"DEBUG: Web app file location: {__file__}")
-print(f"DEBUG: Template directory: {template_dir}")
-print(f"DEBUG: Templates exist: {os.path.exists(template_dir)}")
+print(f"DEBUG: Current file dir: {current_file_dir}")
+print(f"DEBUG: Working directory: {os.getcwd()}")
+
+# Try multiple possible template locations
+possible_template_paths = [
+    os.path.join(current_file_dir, 'templates'),  # src/templates
+    os.path.join(os.getcwd(), 'templates'),       # cwd/templates  
+    os.path.join(os.getcwd(), 'src', 'templates'), # cwd/src/templates
+    'templates',  # relative
+]
+
+template_dir = None
+static_dir = None
+
+for path in possible_template_paths:
+    abs_path = os.path.abspath(path)
+    if os.path.exists(abs_path) and os.path.isdir(abs_path):
+        template_dir = abs_path
+        static_dir = os.path.join(os.path.dirname(abs_path), 'static')
+        print(f"DEBUG: Found templates at: {template_dir}")
+        break
+
+if not template_dir:
+    # Fallback
+    template_dir = os.path.join(current_file_dir, 'templates')
+    static_dir = os.path.join(current_file_dir, 'static')
+    print(f"DEBUG: Using fallback template path: {template_dir}")
+
+print(f"DEBUG: Final template directory: {template_dir}")
+print(f"DEBUG: Template directory exists: {os.path.exists(template_dir)}")
 
 app = Flask(__name__,
            template_folder=template_dir,

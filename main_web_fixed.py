@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 """
-Telegram MCQ Bot - Web Service Entry Point
-Entry point that runs both the Telegram bot and a Flask web interface
+Simplified entry point for Render deployment
+Runs from root directory to avoid path issues
 """
-import sys
 import os
+import sys
 import threading
 import time
-from datetime import datetime
 
-# Add src directory to Python path
+# Add current directory to Python path (instead of src)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, 'src')
-sys.path.insert(0, src_dir)
-
-# Import modules
-import main as src_main
+sys.path.insert(0, current_dir)
+sys.path.insert(0, os.path.join(current_dir, 'src'))
 
 def run_flask_app():
     """Run Flask web application"""
     try:
-        # Import here to ensure src is in path
+        # Change to src directory for templates
+        src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+        os.chdir(src_dir)
+        print(f"Changed to src directory: {os.getcwd()}")
+        
+        # Now import and run
+        sys.path.insert(0, os.getcwd())
         from web_app import app
         
         port = int(os.environ.get('PORT', 10000))
@@ -44,6 +46,13 @@ def run_telegram_bot():
         # Small delay to let Flask start first
         time.sleep(2)
         print("Starting Telegram bot...")
+        
+        # Change to src directory
+        src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+        os.chdir(src_dir)
+        sys.path.insert(0, os.getcwd())
+        
+        import main as src_main
         updater = src_main.main(run_as_thread=True)
         
         # If we got an updater back, keep the thread alive
