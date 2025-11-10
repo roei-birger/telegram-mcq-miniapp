@@ -8,7 +8,7 @@ services:
     buildCommand: |
       python --version
       bash build.sh
-    startCommand: python main_web.py
+    startCommand: python web_app_render.py
     envVars:
       # Critical API Keys (set manually in Dashboard)
       - key: TELEGRAM_BOT_TOKEN

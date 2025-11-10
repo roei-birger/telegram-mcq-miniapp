@@ -40,14 +40,17 @@ print(f"DEBUG: Working directory: {os.getcwd()}")
 
 # Enhanced template path detection for deployment environments
 possible_template_paths = [
-    # Render deployment paths (highest priority) - build.sh copies templates to root
-    '/opt/render/project/templates',                    # Root templates in Render (copied by build.sh)
-    '/opt/render/project/src/templates',                # Src templates in Render (fallback)
+    # Render deployment paths - build.sh copies templates to project root
+    '/opt/render/project/templates',                    # Root templates in Render (copied by build.sh) 
     
-    # Parent directory of src (for when running from src/)
+    # If running from src directory (Render case), go up to project root
+    os.path.join(os.path.dirname(os.path.dirname(current_file_dir)), 'templates'),  # ../../templates from src/src
     os.path.join(os.path.dirname(current_file_dir), 'templates'),  # ../templates from src
     
-    # Current working directory variations (works for both local and Render)
+    # Standard Render paths (fallback)
+    '/opt/render/project/src/templates',                # Src templates in Render (fallback)
+    
+    # Current working directory variations (works for local development) 
     os.path.join(os.getcwd(), 'templates'),             # cwd/templates
     os.path.join(os.getcwd(), 'src', 'templates'),      # cwd/src/templates
     
