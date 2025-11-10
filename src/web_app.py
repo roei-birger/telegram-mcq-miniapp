@@ -38,11 +38,11 @@ print(f"DEBUG: Web app file location: {__file__}")
 print(f"DEBUG: Current file dir: {current_file_dir}")
 print(f"DEBUG: Working directory: {os.getcwd()}")
 
-# Try multiple possible template locations
+# Try multiple possible template locations - prioritize root level for deployment
 possible_template_paths = [
-    os.path.join(current_file_dir, 'templates'),  # src/templates
-    os.path.join(os.getcwd(), 'templates'),       # cwd/templates  
-    os.path.join(os.getcwd(), 'src', 'templates'), # cwd/src/templates
+    os.path.join(os.getcwd(), 'templates'),         # cwd/templates (priority)
+    os.path.join(current_file_dir, 'templates'),    # src/templates
+    os.path.join(os.getcwd(), 'src', 'templates'),  # cwd/src/templates
     'templates',  # relative
 ]
 
@@ -53,8 +53,18 @@ for path in possible_template_paths:
     abs_path = os.path.abspath(path)
     if os.path.exists(abs_path) and os.path.isdir(abs_path):
         template_dir = abs_path
-        static_dir = os.path.join(os.path.dirname(abs_path), 'static')
+        # For static dir, check both root and src level
+        static_candidates = [
+            os.path.join(os.path.dirname(abs_path), 'static'),
+            os.path.join(os.path.dirname(abs_path), 'src', 'static')
+        ]
+        static_dir = static_candidates[0]  # Default
+        for static_path in static_candidates:
+            if os.path.exists(static_path):
+                static_dir = static_path
+                break
         print(f"DEBUG: Found templates at: {template_dir}")
+        print(f"DEBUG: Using static at: {static_dir}")
         break
 
 if not template_dir:
